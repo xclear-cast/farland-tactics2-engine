@@ -102,6 +102,9 @@ def main():
     args=parser.parse_args()
     if platform.system()!='Darwin'or platform.machine()!='arm64':raise RuntimeError('Actual Apple Silicon runner required')
     destination=ROOT/'dist/FT2-External-macos-arm64'
+    media=[p.relative_to(destination).as_posix()for p in destination.rglob('*')
+           if p.is_file()and p.suffix.lower()in ('.gif','.mp4','.webm','.mov','.avi','.mkv')]
+    if media:raise RuntimeError('Text-only release contains instructional media: '+str(media))
     app=destination/'FT2 External Engine.app'
     launcher=app/'Contents/MacOS/FT2External'
     runtime=app/'Contents/MacOS/GodotRuntime'

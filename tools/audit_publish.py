@@ -20,7 +20,7 @@ TOOL_FILES={'audit_publish.py','build_external.py','build_macos_arm64.py',
             'convert_installation.py','import_content.py','package_converter.py',
             'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py'}
 SOURCE_SUFFIXES={'.gd','.gdshader','.gdshaderinc','.uid'}
-DOC_FILES={'docs/usage-guide.mp4','docs/usage-guide-mac.mp4','docs/usage-guide.md','docs/usage-guide.json',
+DOC_FILES={'docs/usage-guide.md',
            'docs/MODDING.md','docs/FORMATS.md','docs/ASSET_POLICY.md',
            'docs/EXPANSION_EDITOR.md','docs/EXTENSION_RUNTIME_CONTRACT.md'}
 EXAMPLE_FILES={'mods/example_balance/mod.json','mods/example_item_price/mod.json','mods/example_item_price/README.md',
@@ -30,7 +30,7 @@ EXAMPLE_FILES={'mods/example_balance/mod.json','mods/example_item_price/mod.json
 FORBIDDEN_PARTS={'private','dist','.git','.venv','.godot','__pycache__','node_modules'}
 DATA_SUFFIXES={'.dat','.bin','.idx','.pal','.bmp','.png','.jpg','.jpeg','.wav','.mid',
                '.sf2','.exe','.pck','.ttf','.ttc','.otf','.zip','.7z','.tar','.lzh',
-               '.img','.pdb','.dll','.so','.dylib','.lib','.gif'}
+               '.img','.pdb','.dll','.so','.dylib','.lib','.gif','.mp4','.webm','.mov','.avi','.mkv'}
 SECRET_PATTERNS={
     'private_key':re.compile(r'-----BEGIN (?:RSA |EC |OPENSSH |DSA )?PRIVATE KEY-----'),
     'github_token':re.compile(r'\b(?:gh[pousr]_[A-Za-z0-9]{20,}|github_pat_[A-Za-z0-9_]{30,})\b'),
@@ -73,14 +73,6 @@ def sha(data):return hashlib.sha256(data).hexdigest()
 def inspect(relative,data):
     errors=[]
     if not allowed(relative):return [{'path':relative,'kind':'outside_publication_allowlist'}]
-    if relative in {'docs/usage-guide.mp4','docs/usage-guide-mac.mp4'}:
-        document=json.loads((ROOT/'docs/usage-guide.json').read_text(encoding='utf-8'))
-        if not document.get('instructional_example')or document.get('original_game_data_used')is not False or document.get('original_game_screenshots_used')is not False or document.get('private_paths_displayed')is not False or document.get('host_desktop_used')is not False or document.get('privacy_reviewed')is not True:
-            return [{'path':relative,'kind':'instructional_media_scope_not_verified'}]
-        row=next((row for row in document['files']if row['path']==relative),{})
-        if row.get('sha256')!=sha(data)or row.get('bytes')!=len(data):errors.append({'path':relative,'kind':'instructional_media_digest_mismatch'})
-        if relative.endswith('.mp4')and(data[4:8]!=b'ftyp'or len(data)>10_000_000):errors.append({'path':relative,'kind':'invalid_instructional_video'})
-        return errors
     try:text=data.decode('utf-8')
     except UnicodeDecodeError:return [{'path':relative,'kind':'unexpected_binary'}]
     if b'\0'in data:errors.append({'path':relative,'kind':'unexpected_nul_byte'})

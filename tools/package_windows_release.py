@@ -30,6 +30,8 @@ def main():
         if not path.is_file():continue
         relative=path.relative_to(source)
         name=relative.as_posix()
+        if relative.suffix.lower()in ('.gif','.mp4','.webm','.mov','.avi','.mkv'):
+            raise ValueError('Instructional media is excluded from the text-only release: '+name)
         if path.is_symlink():raise ValueError('Release symlink rejected: '+name)
         if any(part in ('private','__pycache__','.venv','.git')for part in relative.parts):raise ValueError('Private files in release input: '+name)
         if name in TOP or name.startswith(('tools/','mods/','docs/')) or name=='native/bin/ft2synth.dll':files.append((path,name))

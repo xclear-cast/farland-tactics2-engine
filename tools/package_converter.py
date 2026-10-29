@@ -10,7 +10,7 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
     sources = [root/'tools/convert_installation.py', root/'tools/import_content.py',
                root/'requirements.txt',root/'COPYING-converter',root/'CONVERTER_LICENSE.json',
                root/'LICENSING.md',root/'THIRD_PARTY_NOTICES.md',root/'EXAMPLES_LICENSE']
-    sources += [root/'docs'/name for name in ('usage-guide.mp4','usage-guide-mac.mp4','usage-guide.md','usage-guide.json',
+    sources += [root/'docs'/name for name in ('usage-guide.md',
                                              'MODDING.md','FORMATS.md','ASSET_POLICY.md',
                                              'EXPANSION_EDITOR.md','EXTENSION_RUNTIME_CONTRACT.md')]
     for source in (root/'tools/converters').rglob('*'):
@@ -25,9 +25,9 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
             raise ValueError('Missing or unsafe converter source: '+str(source))
     tools = destination/'tools'
     tools.mkdir(parents=True,exist_ok=True)
-    # Remove only the two retired public GIF outputs from a reused build tree.
+    # Remove only retired tutorial outputs from a reused build tree.
     # Signed Mac release archives are rebuilt/re-signed by the normal Mac build.
-    for name in ('usage-guide.gif','usage-guide-mac.gif'):
+    for name in ('usage-guide.gif','usage-guide-mac.gif','usage-guide.mp4','usage-guide-mac.mp4','usage-guide.json'):
         legacy=destination/'docs'/name
         if legacy.exists():
             if legacy.is_symlink()or not legacy.resolve().is_relative_to(destination)or not legacy.is_file():
