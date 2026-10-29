@@ -189,6 +189,12 @@ def main():
     scaling_report=json.loads((scaling_output/'result.json').read_text(encoding='utf-8'))
     if not scaling_report.get('passed')or scaling_report.get('original_data_used')is not False:
         raise RuntimeError('Content-free editor display scaling did not pass')
+    clients_output=output/'editor-clients';clients_output.mkdir(parents=True,exist_ok=True)
+    run('godot-ai-client-registry',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_editor_clients.gd','--',f'--clients-output={clients_output}'])
+    run('all-client-setting-formats',[sys.executable,ROOT/'tools/ci/validate_editor_clients.py','--directory',clients_output])
+    clients_report=json.loads((clients_output/'parsed-settings.json').read_text(encoding='utf-8'))
+    if not clients_report.get('passed')or clients_report.get('clients')!=26 or not clients_report.get('deepseek_harness_verified'):
+        raise RuntimeError('The complete 26-client registry did not validate')
     run('no-original-data',[launcher,'--headless','--audio-driver','Dummy','--','--check-content',f'--engine-config={output/"absent-connection.json"}'],expected=2)
     if args.gui:
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
@@ -246,6 +252,7 @@ def main():
             'synthetic_extension_checks':extension_report['checks'],'editor_control_checks':editor_report['checks'],
             'editor_baseline_synthetic_checks':baseline_report['checks'],
             'editor_scaling_checks':scaling_report['checks'],
+            'editor_mcp_client_profiles':26,'editor_mcp_client_setting_checks':clients_report['checks'],
             'editor_mcp_tools':14,'editor_mcp_stdio_verified':True,
             'editor_mcp_live_tcp_tests':4,
             'tests':records,'game_data_used':False,

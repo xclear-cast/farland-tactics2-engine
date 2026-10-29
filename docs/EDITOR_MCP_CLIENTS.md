@@ -24,22 +24,90 @@ AI에게 그대로 요청할 수 있는 예:
 
 > 방금 바꾼 캐릭터의 HP만 원본값으로 되돌리고, 나머지 변경은 유지해줘.
 
-## 어떤 AI 도구에 연결하나요?
+## GodotAI와 같은 AI 클라이언트 26개
 
-아래는 각 클라이언트의 공식 문서로 확인한 **로컬 stdio MCP 설정 형식**입니다. 제작기에서 복사한 설정을 우선 사용하세요. 클라이언트에 서버를 추가한 뒤 도구가 보이는지 확인합니다. 모든 클라이언트의 실제 계정·버전을 여기서 함께 실행 검증했다는 뜻은 아닙니다.
+**DeepSeek Harness를 포함해 GodotAI의 26개 AI 클라이언트에 맞는 연결 설정을 제공합니다.** 목록과 순서는 [hi-godot/godot-ai의 `_registry.gd`](https://github.com/hi-godot/godot-ai/blob/main/plugin/addons/godot_ai/clients/_registry.gd)를 기준으로 맞췄습니다. 설정 방식은 [upstream client-configuration 안내](https://github.com/hi-godot/godot-ai/blob/main/docs/client-configuration.md)와 클라이언트 descriptor를 참고합니다.
 
-| AI 클라이언트 | 설정 위치·형식 | 연결 확인 |
-|---|---|---|
-| Claude Code | 추가 명령 또는 프로젝트 `.mcp.json`의 `mcpServers` | `/mcp` |
-| OpenCode V1 | `opencode.json` / `opencode.jsonc`의 `mcp.<이름>`, `enabled: true` | MCP 서버 목록 |
-| OpenCode V2 | `mcp.servers.<이름>`, `protocol: "legacy"` | `/mcps`, `opencode mcp list` |
-| Codex CLI | `codex mcp add` 또는 `~/.codex/config.toml`의 `mcp_servers` | `codex mcp list` |
-| Cursor | 프로젝트 `.cursor/mcp.json` 또는 사용자 `~/.cursor/mcp.json` | MCP 설정의 서버·도구 목록 |
-| Claude Desktop | 설정에서 연 `claude_desktop_config.json`의 `mcpServers` | 앱 재시작 후 도구 목록 |
-| Cline | MCP Servers → Configure → `cline_mcp_settings.json` | 서버 활성 상태·도구 목록 |
-| Windsurf / Cascade | MCP 설정에서 여는 `mcp_config.json`의 `mcpServers` | MCP 서버 토글·도구 목록 |
+여기서 26개는 **AI 클라이언트 목록**이며, 제작기가 제공하는 편집 도구는 아래의 **FT2 도구 14개**입니다. 클라이언트를 선택하고 **연결 설정 복사**로 얻은 해당 형식을 사용하세요. 앱이 개인 클라이언트 설정을 자동으로 수정하지 않습니다.
 
-Claude Code 형식은 [공식 MCP 안내](https://code.claude.com/docs/en/mcp), OpenCode는 [V1 문서](https://opencode.ai/docs/mcp-servers/)와 [V2 문서](https://opencode.ai/v2/docs/mcp-servers), Codex는 [공식 MCP 문서](https://learn.chatgpt.com/docs/extend/mcp?surface=cli)를 기준으로 합니다. Cursor는 [공식 MCP 설정](https://cursor.com/docs/mcp), Claude Desktop은 [MCP의 로컬 연결 안내](https://modelcontextprotocol.io/docs/2026-07-28/develop/connect-local-servers), Cline은 [공식 MCP 안내](https://docs.cline.bot/mcp/mcp-overview)를 참고하세요. Windsurf의 기존 Cascade 문서는 현재 [Devin Desktop의 Cascade 설정](https://docs.devin.ai/desktop/cascade/mcp)으로 연결되므로 설치된 앱의 **Open MCP config file**을 이용하면 해당 버전의 파일을 찾을 수 있습니다.
+| 순서 | AI 클라이언트 | 식별자 | 설정 형식 |
+|---|---|---|---|
+| 1 | Claude Code | `claude_code` | 명령 / JSON |
+| 2 | Claude Desktop | `claude_desktop` | JSON |
+| 3 | Codex | `codex` | TOML |
+| 4 | CodeBuddy | `codebuddy` | JSON |
+| 5 | Grok Build | `grok` | TOML |
+| 6 | Antigravity | `antigravity` | JSON |
+| 7 | Cursor | `cursor` | JSON |
+| 8 | Devin Desktop (Windsurf) | `windsurf` | JSON |
+| 9 | VS Code | `vscode` | JSON |
+| 10 | VS Code Insiders | `vscode_insiders` | JSON |
+| 11 | Zed | `zed` | JSON |
+| 12 | Gemini CLI | `gemini_cli` | JSON |
+| 13 | Cline | `cline` | JSON |
+| 14 | Kilo Code | `kilo_code` | JSON |
+| 15 | Roo Code | `roo_code` | JSON |
+| 16 | Zoo Code | `zoo_code` | JSON |
+| 17 | Kiro | `kiro` | JSON |
+| 18 | Trae | `trae` | JSON |
+| 19 | OpenCode | `opencode` | JSON |
+| 20 | Qwen Code | `qwen_code` | JSON |
+| 21 | Kimi Code | `kimi_code` | JSON |
+| 22 | Hermes Agent | `hermes` | YAML |
+| 23 | Pi Agent | `pi` | JSON |
+| 24 | DeepSeek Harness | `deepseek_harness` | Cordis YAML / JSON 부분집합 |
+| 25 | ZCode | `zcode` | JSON |
+| 26 | Oh My Pi | `omp` | JSON |
+
+OpenCode는 같은 클라이언트 안에서 V1/V2 설정을 구분합니다. **일반 MCP** 설정은 이 26개 외의 stdio 지원 클라이언트에 직접 연결할 때 사용합니다. 설정 생성·로컬 stdio 도구 연결 검증과, 모든 AI 앱의 실제 계정으로 로그인해 검증하는 범위는 구분합니다.
+
+## DeepSeek Harness 연결
+
+1. 제작기의 **AI 연결**에서 **DeepSeek Harness**를 고릅니다.
+2. **AI 연결 시작 → 연결 설정 복사**를 누릅니다.
+3. Harness의 `~/.dsh/cordis.patch.yml`에 새 서버용 `insert` 항목을 추가합니다. `DSH_HOME`을 지정했다면 `$DSH_HOME/cordis.patch.yml`을 사용합니다.
+4. 사용하는 Harness 프로필을 다시 시작하고 FT2 도구가 나타나는지 확인합니다.
+
+Cordis 홈 패치 파일은 최상위 **배열**입니다. 새 서버를 넣을 때는 `insert`가 필요하며, 기존 항목을 덮어쓰는 단순 `id` 행과 다릅니다. 이 경로·형식은 [GodotAI DeepSeek descriptor](https://github.com/hi-godot/godot-ai/blob/main/plugin/addons/godot_ai/clients/deepseek_harness.gd)와 [DSH strategy](https://github.com/hi-godot/godot-ai/blob/main/plugin/addons/godot_ai/clients/_dsh_strategy.gd)를 기준으로 합니다.
+
+아래는 Windows 패키지 예시입니다. 실행 파일·연결 파일은 제작기가 복사해 주는 본인의 경로로 바꾸세요.
+
+```yaml
+- insert:
+    - id: mcp-ft2
+      name: '@deepseek-ai/dsh-mcp-client'
+      config:
+        serverName: ft2
+        transport: stdio
+        command: 'C:/FT2/tools/ft2-convert/ft2-convert.exe'
+        args:
+          - --editor-mcp
+          - --connection
+          - 'C:/FT2-private/editor_mcp_connection.json'
+```
+
+같은 내용의 **JSON 부분집합** 표현도 YAML 파서가 읽을 수 있습니다. 기존 파일에 추가할 때는 배열 구조와 다른 항목을 유지합니다.
+
+```json
+[
+  {
+    "insert": [
+      {
+        "id": "mcp-ft2",
+        "name": "@deepseek-ai/dsh-mcp-client",
+        "config": {
+          "serverName": "ft2",
+          "transport": "stdio",
+          "command": "C:/FT2/tools/ft2-convert/ft2-convert.exe",
+          "args": ["--editor-mcp", "--connection", "C:/FT2-private/editor_mcp_connection.json"]
+        }
+      }
+    ]
+  }
+]
+```
+
+`serverName`, `transport`, `command`, `args`는 [DeepSeek 공식 MCP client README](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md)의 설정 필드입니다. `stdio` 명령에 HTTP용 `url`을 함께 넣지 않습니다. Harness에서는 도구가 `mcp__ft2__ft2_read_project`처럼 서버 이름을 붙여 나타납니다. 먼저 프로젝트 읽기를 요청한 뒤 편집·검사·테스트를 이어가세요.
 
 ## 연결 설정을 직접 작성할 때
 
@@ -156,37 +224,6 @@ args = ["C:/FT2/tools/editor_mcp.py", "--connection", "C:/FT2-private/editor_mcp
 | `ft2_stop_play` | 실행 중인 테스트 게임 종료 |
 
 변경은 열린 제작기에 반영됩니다. 캐릭터·스킬의 원본값 복원은 로컬 ID·기반 참조·레벨을 유지하며 편집값을 되돌립니다. 정품이 연결되지 않으면 원작 검색·비교·원본 복원용 값은 사용할 수 없습니다. 원작과 개인 캐시는 편집 대상이 아닙니다.
-
-## Godot 엔진 자체를 고치는 개발자용 MCP
-
-확장팩 작성은 위 FT2 도구를 사용합니다. Godot 장면·노드·엔진 프로젝트도 함께 수정하는 개발자는 별도로 Godot MCP를 연결할 수 있습니다.
-
-현재 제공된 Godot 도구 14개는 [Coding-Solo/godot-mcp의 README](https://github.com/Coding-Solo/godot-mcp)에 나오는 도구명과 일치합니다. 이 저장소는 커뮤니티 MCP 서버이며 Godot 제작사의 공식 서버라는 의미는 아닙니다. upstream은 Godot, Node.js 18 이상과 npm, MCP 클라이언트를 요구하고 Claude Code·Cline·Cursor의 설정 예시를 제공합니다.
-
-| Godot 도구 | 기능 |
-|---|---|
-| `get_godot_version` | 설치된 엔진 버전 확인 |
-| `list_projects` | 프로젝트 검색 |
-| `get_project_info` | 프로젝트 정보 읽기 |
-| `launch_editor` | 에디터 열기 |
-| `create_scene` | 장면 생성 |
-| `add_node` | 노드 추가 |
-| `load_sprite` | Sprite2D에 이미지 연결 |
-| `save_scene` | 장면 저장 |
-| `run_project` | 실행·출력 수집 |
-| `get_debug_output` | 디버그 출력 읽기 |
-| `stop_project` | 실행 종료 |
-| `export_mesh_library` | MeshLibrary 내보내기 |
-| `get_uid` | 리소스 UID 읽기 |
-| `update_project_uids` | UID 참조 갱신 |
-
-upstream이 안내하는 Claude Code 등록 명령:
-
-```sh
-claude mcp add godot -- npx @coding-solo/godot-mcp
-```
-
-Godot MCP 연결은 `ft2_*` 제작기 도구 연결과 별개입니다. 확장팩 JSON을 수정할 때는 FT2 MCP, 엔진의 장면·코드를 개발할 때는 Godot MCP를 고르면 됩니다. [upstream 설정 안내](https://github.com/Coding-Solo/godot-mcp#quick-start)
 
 ## 연결되지 않을 때
 

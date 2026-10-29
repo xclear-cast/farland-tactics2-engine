@@ -50,6 +50,8 @@ var _chrome_ready:=false
 var bridge
 var _mcp_status:Label
 var _mcp_client:OptionButton
+var _mcp_version:OptionButton
+var _mcp_location:Label
 var _mcp_config:TextEdit
 var _mcp_tools:RichTextLabel
 var _bridge_clock:=0.0
@@ -67,6 +69,7 @@ var _windowed_mode:=Window.MODE_WINDOWED
 var _windowed_size:=Vector2i(1280,840)
 var _windowed_position:=Vector2i.ZERO
 const EditorBridge=preload("res://scripts/editor/ft2_editor_bridge.gd")
+const ClientRegistry=preload("res://scripts/editor/ft2_editor_clients.gd")
 const MapView=preload("res://scripts/editor/ft2_editor_map_view.gd")
 const StoryView=preload("res://scripts/editor/ft2_editor_story_view.gd")
 
@@ -908,15 +911,20 @@ func _build_ai_tab()->void:
 	var page:=VBoxContainer.new();page.name="AI 연결";page.add_theme_constant_override("separation",12);tabs.add_child(page)
 	_text(page,"AI와 함께 확장팩 만들기",23)
 	_text(page,"추천 작업 방식: AI 도구 연결 → 원하는 변경을 말로 요청 → 결과 확인 → 테스트 → 저장",14)
-	_text(page,"Claude Code · OpenCode · Codex · Cursor 등 MCP를 지원하는 도구를 사용할 수 있습니다.",13)
+	_text(page,"Claude Code · OpenCode · Codex · DeepSeek Harness 등 Godot AI의 26개 클라이언트를 연결할 수 있습니다.",13)
 	var bar:=HBoxContainer.new();page.add_child(bar)
 	_mcp_client=OptionButton.new()
-	for title in ["Claude Code / Claude Desktop","OpenCode V1","OpenCode V2","Codex","Cursor / Cline / Windsurf","일반 MCP 클라이언트"]:_mcp_client.add_item(title)
+	for client in ClientRegistry.all():
+		_mcp_client.add_item(str(client.label));_mcp_client.set_item_metadata(_mcp_client.item_count-1,str(client.id))
+	_mcp_client.get_popup().max_size=Vector2i(0,480)
 	bar.add_child(_mcp_client);_mcp_client.item_selected.connect(func(_i):_refresh_mcp_config())
+	_mcp_version=OptionButton.new();_mcp_version.add_item("OpenCode V1");_mcp_version.add_item("OpenCode V2");bar.add_child(_mcp_version)
+	_mcp_version.item_selected.connect(func(_i):_refresh_mcp_config())
 	_button(bar,"mcp_start","AI 연결 시작",_start_mcp)
 	_button(bar,"mcp_copy","연결 설정 복사",_copy_mcp_config)
 	_button(bar,"mcp_stop","연결 종료",_stop_mcp)
 	_mcp_status=_text(page,"AI 연결 꺼짐 · 연결할 도구를 고르고 ‘AI 연결 시작’을 누르세요.",13)
+	_mcp_location=_text(page,"설정 파일",12);_mcp_location.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART
 	var split:=HSplitContainer.new();split.size_flags_vertical=Control.SIZE_EXPAND_FILL;split.split_offset=650;page.add_child(split)
 	var left:=VBoxContainer.new();left.size_flags_horizontal=Control.SIZE_EXPAND_FILL;split.add_child(left)
 	_text(left,"선택한 AI 도구의 연결 설정",16)
@@ -953,15 +961,15 @@ func _mcp_launch()->Dictionary:
 	return {"command":"python"if OS.get_name()=="Windows"else"python3","args":[script,"--connection",connection]}
 func _refresh_mcp_config()->void:
 	if _mcp_config==null:return
-	var launch:=_mcp_launch();var command:Array=[launch.command];command.append_array(launch.args)
-	var config:Dictionary
-	match _mcp_client.selected:
-		1:config={"$schema":"https://opencode.ai/config.json","mcp":{"ft2":{"type":"local","command":command,"enabled":true}}}
-		2:config={"$schema":"https://opencode.ai/config.json","mcp":{"servers":{"ft2":{"type":"local","command":command,"protocol":"legacy"}}}}
-		3:
-			_mcp_config.text="[mcp_servers.ft2]\ncommand = "+JSON.stringify(launch.command)+"\nargs = "+JSON.stringify(launch.args)+"\n";return
-		_:config={"mcpServers":{"ft2":launch}}
-	_mcp_config.text=JSON.stringify(config,"\t")
+	var client:=mcp_selected_client()
+	if client.is_empty():return
+	_mcp_version.visible=str(client.id)=="opencode"
+	_mcp_config.text=ClientRegistry.build(str(client.id),_mcp_launch(),_mcp_version.selected+1)
+	_mcp_location.text="%s · %s · %s"%[str(client.label),str(client.format).to_upper(),str(client.location)]
+
+func mcp_selected_client()->Dictionary:
+	var clients:=ClientRegistry.all()
+	return clients[_mcp_client.selected]if _mcp_client.selected>=0 and _mcp_client.selected<clients.size()else{}
 func _copy_mcp_config()->void:
 	_refresh_mcp_config();DisplayServer.clipboard_set(_mcp_config.text);_status("연결 설정을 복사했습니다. 선택한 AI 도구의 MCP 설정에 추가하세요.")
 

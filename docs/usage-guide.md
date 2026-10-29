@@ -60,7 +60,7 @@ Mac 실행이 차단되면 [README의 Mac 실행 안내](../README.md#3-운영�
 AI를 쓰지 않을 때도 같은 화면에서 직접 값을 고치고 **속성 적용**을 누르면 됩니다.
 맵 화면은 휠로 확대·축소하고 가운데 마우스 버튼으로 이동합니다. 지도 칸과 이야기 카드를 클릭하면 해당 항목을 편집합니다.
 
-[AI별 연결 설정](EDITOR_MCP_CLIENTS.md)과 [자세한 제작기 사용법](EXPANSION_EDITOR.md)을 참고하세요.
+[DeepSeek Harness 등 AI 26개 연결 설정](EDITOR_MCP_CLIENTS.md)과 [자세한 제작기 사용법](EXPANSION_EDITOR.md)을 참고하세요.
 
 ## 6. 다른 사람이 만든 확장팩을 실행하세요
 

@@ -26,6 +26,10 @@ class ProtocolTests(unittest.TestCase):
     def test_negotiation_lifecycle_and_tools(self):
         for revision in mcp.VERSIONS + ("future-version",):
             server = mcp.Server(Path("not-connected"))
+            probe = server.handle({"jsonrpc": "2.0", "id": -1, "method": "server/discover", "params": {}})
+            self.assertEqual(probe["error"]["code"], -32601)
+            self.assertIsNone(server.version)
+            self.assertFalse(server.ready)
             self.assertEqual(server.handle({"jsonrpc": "2.0", "id": 0, "method": "ping"})["result"], {})
             self.assertEqual(server.handle({"jsonrpc": "2.0", "id": 1, "method": "tools/list"})["error"]["code"], -32002)
             initialized = server.handle({"jsonrpc": "2.0", "id": 2, "method": "initialize", "params": {"protocolVersion": revision}})
@@ -54,21 +58,31 @@ class ProtocolTests(unittest.TestCase):
                 with self.assertRaises(ValueError):mcp.connection_profile(path)
 
     def test_real_stdio_only_emits_jsonrpc_and_exits_on_eof(self):
-        messages = [b'{bad json}\n', json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25"}}).encode() + b"\n",
+        messages = [b'{bad json}\n', b'{"jsonrpc":"2.0","id":0,"method":"server/discover","params":{}}\n',
+                    json.dumps({"jsonrpc": "2.0", "id": 1, "method": "initialize", "params": {"protocolVersion": "2025-11-25"}}).encode() + b"\n",
                     b'{"jsonrpc":"2.0","method":"notifications/initialized"}\n', b'{"jsonrpc":"2.0","id":2,"method":"tools/list"}\n']
         result = subprocess.run([sys.executable, str(MODULE)], input=b"".join(messages), capture_output=True, timeout=10)
         self.assertEqual(result.returncode, 0)
         rows = [json.loads(line) for line in result.stdout.splitlines()]
-        self.assertEqual(len(rows), 3)
+        self.assertEqual(len(rows), 4)
         self.assertEqual(rows[0]["error"]["code"], -32700)
-        self.assertEqual(len(rows[2]["result"]["tools"]), 14)
+        self.assertEqual(rows[1]["error"]["code"], -32601)
+        self.assertEqual(len(rows[3]["result"]["tools"]), 14)
+        # A probing client may close and reopen stdio for its legacy fallback.
+        restarted = subprocess.run([sys.executable, str(MODULE)], input=b"".join(messages[2:]), capture_output=True, timeout=10)
+        self.assertEqual(restarted.returncode, 0)
+        restarted_rows = [json.loads(line) for line in restarted.stdout.splitlines()]
+        self.assertEqual(len(restarted_rows), 2)
+        self.assertEqual(len(restarted_rows[1]["result"]["tools"]), 14)
 
 
 @unittest.skipUnless(os.environ.get("FT2_BRIDGE_GODOT"), "Set FT2_BRIDGE_GODOT for actual Godot integration")
 class BridgeIntegration(unittest.TestCase):
     def test_real_socket_authoring_reset_and_protection(self):
         with tempfile.TemporaryDirectory(prefix="ft2-mcp-") as temporary:
-            directory = Path(temporary);log = (directory / "godot.log").open("wb")
+            # macOS /var is a system alias of /private/var. Use the physical
+            # fixture directory; production deliberately rejects symlink paths.
+            directory = Path(temporary).resolve();log = (directory / "godot.log").open("wb")
             godot = subprocess.Popen([os.environ["FT2_BRIDGE_GODOT"], "--headless", "--audio-driver", "Dummy", "--path", str(ROOT / "game"),
                                       "--script", "res://tests/test_editor_bridge.gd", "--", "--bridge-fixture=" + str(directory)], stdout=log, stderr=log)
             client = None
@@ -118,7 +132,8 @@ class BridgeIntegration(unittest.TestCase):
                 self.assertTrue(call("reset_record", kind="characters", index=index)["ok"])
                 self.assertEqual(call("get_record", kind="characters", index=index)["record"]["level"], 23)
                 self.assertTrue(call("save")["ok"])
-                self.assertTrue(call("open", path=str(directory / "project"))["ok"])
+                reopened = call("open", path=str(directory / "project"))
+                self.assertTrue(reopened["ok"], reopened)
                 self.assertTrue(call("validate")["ok"])
                 self.assertTrue(call("export", path=str(directory / "project/authored.zip"))["ok"])
                 for name, path in (("save", directory / "outside"), ("open", directory / "protected-cache"), ("export", directory / "protected-original/attack.zip")):

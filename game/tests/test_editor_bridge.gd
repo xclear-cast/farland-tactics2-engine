@@ -44,7 +44,10 @@ func run() -> void:
 	write(cache.path_join("data/port_ready/assets/apd/animations/CHAR_00E.json"),{})
 	editor.project.source_data=data
 	editor.project.content.characters[0].base_race=0;editor.project.content.characters[1].base_race=0
-	editor.project.save_project(output.path_join("project"))
+	var initial_save:Dictionary=editor.project.save_project(output.path_join("project"))
+	if not initial_save.get("ok",false):
+		write(output.path_join("ready.json"),{"ok":false,"error":initial_save.get("error","Initial fixture save failed")})
+		quit(1);return
 	bridge.connection_path=output.path_join("connection.json")
 	var result: Dictionary=bridge.start(editor)
 	write(output.path_join("ready.json"),result)

@@ -2,6 +2,8 @@
 """Local FT2 authoring MCP server, Python stdlib only; no provider keys or cloud.
 
 MCP legacy stdio lifecycle revisions 2024-11-05 through 2025-11-25.
+Modern server/discover probes receive method-not-found for explicit legacy
+fallback; this server does not implement the modern discovery protocol.
 The separate loopback bridge is private application transport, not HTTP MCP.
 """
 from __future__ import annotations
@@ -165,6 +167,8 @@ class Server:
                           "instructions": "Local authoring only. Enable MCP in the editor. Writes stay in its selected project workspace; originals and caches are protected."}
             elif method == "ping":
                 result = {}
+            elif method == "server/discover":
+                raise RpcError(-32601, "server/discover is unsupported; use legacy MCP initialize over stdio")
             elif not self.ready:
                 raise RpcError(-32002, "Initialize and send notifications/initialized first")
             elif method == "tools/list":

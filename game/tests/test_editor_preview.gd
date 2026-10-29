@@ -49,9 +49,10 @@ func run()->void:
 	var bridge_started:Dictionary=editor.bridge.start(editor)
 	if not bridge_started.get("ok",false):fail("Private local bridge could not start");return
 	var configurations:Array=[]
-	for index in 6:
+	for index in editor._mcp_client.item_count:
 		editor._mcp_client.select(index);editor._refresh_mcp_config()
-		configurations.append({"index":index,"format":"toml"if index==3 else"json","text":editor._mcp_config.text})
+		var profile:Dictionary=editor.mcp_selected_client()
+		configurations.append({"index":index,"id":profile.id,"format":profile.format,"text":editor._mcp_config.text})
 	write_json(output.path_join("client-configurations.json"),configurations)
 	write_json(output.path_join("ready.json"),{"pid":OS.get_process_id(),"launch":editor._mcp_launch(),"tool_panel":editor._mcp_tools.text,"bridge_running":editor.bridge.status().running,"external_preview_enabled":editor.external_preview_enabled})
 	started=Time.get_ticks_msec()

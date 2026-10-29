@@ -15,6 +15,8 @@ explicit paths:
 - game/tests/test_editor_workbench.gd
 - game/tests/test_editor_preview.gd
 - game/tests/test_editor_source_link.gd
+- game/tests/test_editor_clients.gd
+- tools/ci/validate_editor_clients.py
 - game/tests/test_editor_baseline.gd
 - docs/MODDING.md
 - docs/FORMATS.md
