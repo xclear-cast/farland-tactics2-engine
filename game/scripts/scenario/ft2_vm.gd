@@ -468,6 +468,10 @@ func _execute(op: int, a: Array) -> bool:
 			return true
 		25:
 			var slot := int(a[0]); var stem := _actor_stem(slot)
+			# 43E0E8..43E125 stores each parsed direction before starting the job.
+			# Unit+06 therefore already holds the final path direction during movement.
+			var directions := FT2ActorJobs.directions(str(a[2]))
+			if not directions.is_empty(): _write(slot,6,directions.back())
 			actor_busy[slot] = jobs.play_path(slot,stem,_cell(slot),str(a[2]),str(a[1]),now_ms,_job_metadata(slot))
 		26: pass
 		27:

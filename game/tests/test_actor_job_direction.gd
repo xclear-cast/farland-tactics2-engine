@@ -6,6 +6,9 @@ class SyntheticData:
 	extends RefCounted
 	var requested: Array[String]=[]
 	var dataset:={"name":"SYNTHETIC_ACTOR","animations":{"F.SYNTHETIC":{"groups":[{"move":[24,-12],"velocity":[0.125,-0.0625],"steps":[[0,64,0,-1,0,0],[1,64,0,-1,0,0],[2,64,0,-1,0,0]]}],"duration":192}}}
+	func _init() -> void:
+		for prefix in ["F.","B."]:
+			for index in [1,2]:dataset.animations[prefix+"PATH"+str(index)]=dataset.animations["F.SYNTHETIC"].duplicate(true)
 	func load_apd(stem: String) -> Dictionary:
 		requested.append(stem)
 		return dataset.duplicate(true)
@@ -78,6 +81,22 @@ func run() -> void:
 		vm.jobs.advance(3000);vm.jobs.advance(3064)
 		check(vm.jobs.jobs[0].player.offset==Vector2i(-8 if direction in [1,2]else 8,-4),"SYSTEM26 mirror affects actual APD movement "+str(direction))
 		check(vm.actor_sprites==actor_before and battle.units[0]==unit,"SYSTEM26 preserves actor metadata and unit bytes "+str(direction))
+	# Native OP25 commits the last path character before the first movement step.
+	for row in [{"path":"wn","direction":3},{"path":"ew","direction":2},{"path":"ns","direction":0},{"path":"we","direction":1},{"path":"","direction":2},{"path":"?","direction":2}]:
+		var battle:=SyntheticBattle.new()
+		var unit:=PackedByteArray();unit.resize(124);unit.fill(0)
+		unit.encode_u16(0,1);unit.encode_u16(2,5);unit.encode_u16(6,2)
+		unit.encode_u32(8,9);unit.encode_u32(12,11);battle.units.append(unit)
+		var vm=VM.new();vm.battle=battle;vm.jobs=Jobs.new(data);vm.now_ms=4000
+		vm.actor_sprites[0]={"stem":"SYNTHETIC_ACTOR"}
+		vm.jobs.cell_committed.connect(vm._job_cell)
+		check(not vm._execute(25,[0,"PATH",row.path]),"path opcode does not synthesize an extra wait "+row.path)
+		check(battle.units[0].decode_u16(6)==int(row.direction),"path direction is committed before animation begins "+row.path)
+		check(Vector2i(battle.units[0].decode_s32(8),battle.units[0].decode_s32(12))==Vector2i(9,11),"direction commit does not prematurely move the unit "+row.path)
+		if not row.path.is_empty()and row.path!="?":
+			for now in range(4000,5000,64):vm.jobs.advance(now)
+			check(battle.units[0].decode_u16(6)==int(row.direction),"movement steps preserve the parser's final direction "+row.path)
+			check(vm.jobs.errors.is_empty(),"synthetic path labels all resolve "+row.path)
 	var report:={"passed":failures.is_empty(),"checks":checks,"failures":failures,"vectors":vectors,"fixtures":"self-authored positive-X APD animation and unit bytes"}
 	if not output.is_empty():
 		DirAccess.make_dir_recursive_absolute(output)

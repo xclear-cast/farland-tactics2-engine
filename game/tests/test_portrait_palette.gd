@@ -107,6 +107,20 @@ func run() -> void:
 	check(bottom.palette_install==[[144,64],[224,16]],"alternate bitmap scene command realizes shared and bottom private bands")
 	paint(view,[bottom])
 	check(rgb(view,144)==PackedByteArray([100,20,30]),"alternate bitmap scene immediately restores shared portrait colors")
+	# The native zero-ms portrait realization terminates an earlier global fade.
+	# It updates only the portrait band, leaving another band's intermediate RGB.
+	var background:PackedByteArray=view.palette.base.duplicate()
+	background[32*3]=120;background[32*3+1]=80;background[32*3+2]=40
+	view.palette.install(background,32,1)
+	view.palette.fade(black,32,1,8,100);view.palette.advance(612)
+	var mid_background:=rgb(view,32)
+	check(mid_background==PackedByteArray([60,40,20])and view.palette.fading,"independent background fade is halfway complete")
+	vm.alternate_surface=false
+	paint(view,[vm._dialogue_half_commands(0,false,false)[0]])
+	check(not view.palette.fading and view.palette.progress==128,"new tactical portrait acquisition ends the earlier global fade")
+	check(rgb(view,32)==mid_background and view.palette._interval==8 and view.palette._epoch==100,"zero-ms realization preserves other current colors and prior timer fields")
+	view.palette.advance(5000)
+	check(rgb(view,32)==mid_background,"stopped background fade does not resume on a later frame")
 	var fallback: Array[Dictionary]=vm.draw_commands()
 	var portrait_commands: Array=[]
 	for command in fallback:

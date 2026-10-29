@@ -1686,7 +1686,9 @@ func _draw_overlay(command: Dictionary, reload_palette: bool = false) -> void:
 			if reload_palette:
 				# 41B000 loads/realizes the portrait bands on every acquisition.
 				# Script paint is an event; normal frame draws must preserve fades.
-				palette.install(bitmap.palette,int(install[0]),int(install[1]))
+				palette.install_base(bitmap.palette,int(install[0]),int(install[1]))
+				# 4180D0(NULL, band, 0ms) also ends any prior global fade.
+				palette.fade(PackedByteArray(),int(install[0]),int(install[1]),0,clock_ms)
 				_mark_palette_loaded(bitmap,int(install[0]),int(install[1]))
 			else:
 				_install_once(bitmap,int(install[0]),int(install[1]))

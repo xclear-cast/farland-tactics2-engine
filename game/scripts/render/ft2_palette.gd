@@ -42,17 +42,20 @@ func fade(target: PackedByteArray, start: int, count: int, interval: int, now: i
 		_fade_to[i] = base[i] if target.is_empty() else target[i]
 	_start = start
 	_count = count
-	_interval = interval & 0xFFFF
-	_epoch = now
-	fading = true
-	progress = 0
-	if _interval == 0:
+	if (interval & 0xFFFF) == 0:
+		# 41818E..4181DD realizes only this band and stops the global fade.
+		# The previous interval/epoch and other bands' intermediate colors survive.
 		progress = 128
 		for i in range(start*3,mini((start+count)*3,768)):
 			_fade_from[i] = _fade_to[i]
 			current[i] = _fade_to[i]
 		fading = false
 		dirty = true
+		return
+	_interval = interval & 0xFFFF
+	_epoch = now
+	fading = true
+	progress = 0
 
 func brightness(first: int, count: int, percent: int, interval: int, now: int) -> void:
 	var target = base.duplicate()
