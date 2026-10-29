@@ -5,6 +5,8 @@ import hashlib
 import json
 import os
 import platform
+import plistlib
+import struct
 import subprocess
 import sys
 import tempfile
@@ -13,6 +15,85 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tools'))
 from run_tests import fixtures
 from prepare_extension_fixtures import prepare as extension_fixtures
+
+
+def version_tuple(value):
+    parts=str(value).split('.')
+    if not 1<=len(parts)<=3 or not all(part.isdigit()for part in parts):
+        raise ValueError('Invalid macOS version: '+str(value))
+    return tuple([int(part)for part in parts]+[0]*(3-len(parts)))
+
+
+def packed_version(value):
+    return ((value>>16)&0xffff,(value>>8)&0xff,value&0xff)
+
+
+def version_text(value):return '.'.join(str(part)for part in value)
+
+
+def macho_minimum_versions(path):
+    """Read declared macOS deployment floors without executing native code.
+
+    Supports thin 32/64-bit Mach-O and both FAT table sizes/endian orders. The
+    application architecture is separately required to be arm64 by lipo.
+    """
+    path=Path(path);total=path.stat().st_size
+    thin={b'\xcf\xfa\xed\xfe':('<',32),b'\xfe\xed\xfa\xcf':('>',32),
+          b'\xce\xfa\xed\xfe':('<',28),b'\xfe\xed\xfa\xce':('>',28)}
+    fat={b'\xca\xfe\xba\xbe':('>',20),b'\xbe\xba\xfe\xca':('<',20),
+         b'\xca\xfe\xba\xbf':('>',32),b'\xbf\xba\xfe\xca':('<',32)}
+    records=[]
+    with path.open('rb')as stream:
+        def parse_slice(offset,size):
+            if offset<0 or size<28 or offset+size>total:raise ValueError('Mach-O slice is out of bounds')
+            stream.seek(offset);header=stream.read(32)
+            if header[:4]not in thin:raise ValueError('Unsupported Mach-O slice magic')
+            endian,header_size=thin[header[:4]]
+            if len(header)<header_size:raise ValueError('Truncated Mach-O header')
+            cpu=struct.unpack_from(endian+'i',header,4)[0]
+            command_count,command_bytes=struct.unpack_from(endian+'II',header,16)
+            if command_count>65535 or command_bytes>size-header_size or command_count>command_bytes//8:
+                raise ValueError('Invalid Mach-O load-command table')
+            stream.seek(offset+header_size);commands=stream.read(command_bytes)
+            position=0;found=[]
+            for _ in range(command_count):
+                if position+8>len(commands):raise ValueError('Truncated Mach-O load command')
+                command,length=struct.unpack_from(endian+'II',commands,position)
+                if length<8 or position+length>len(commands):raise ValueError('Mach-O command length is out of bounds')
+                command&=0x7fffffff
+                if command==0x32: # LC_BUILD_VERSION
+                    if length<24:raise ValueError('Truncated LC_BUILD_VERSION')
+                    target,minimum,sdk=struct.unpack_from(endian+'III',commands,position+8)
+                    if target!=1:raise ValueError('Non-macOS LC_BUILD_VERSION platform: '+str(target))
+                    found.append(('LC_BUILD_VERSION',minimum,sdk))
+                elif command==0x24: # LC_VERSION_MIN_MACOSX
+                    if length<16:raise ValueError('Truncated LC_VERSION_MIN_MACOSX')
+                    minimum,sdk=struct.unpack_from(endian+'II',commands,position+8)
+                    found.append(('LC_VERSION_MIN_MACOSX',minimum,sdk))
+                position+=length
+            if position!=len(commands):raise ValueError('Mach-O load-command size mismatch')
+            if not found:raise ValueError('Mach-O has no declared minimum macOS version')
+            for command,minimum,sdk in found:
+                if minimum==0:raise ValueError('Mach-O minimum macOS version is unspecified')
+                records.append({'cpu_type':cpu,'slice_offset':offset,'command':command,
+                                'minimum_macos':version_text(packed_version(minimum)),
+                                'sdk':version_text(packed_version(sdk))})
+        magic=stream.read(4)
+        if magic in thin:parse_slice(0,total)
+        elif magic in fat:
+            endian,entry_size=fat[magic]
+            raw=stream.read(4)
+            if len(raw)!=4:raise ValueError('Truncated FAT header')
+            count=struct.unpack(endian+'I',raw)[0]
+            if count<1 or count>64 or 8+count*entry_size>total:raise ValueError('Invalid FAT architecture table')
+            table=stream.read(count*entry_size)
+            for index in range(count):
+                start=index*entry_size
+                if entry_size==20:offset,size=struct.unpack_from(endian+'II',table,start+8)
+                else:offset,size=struct.unpack_from(endian+'QQ',table,start+8)
+                parse_slice(offset,size)
+        else:raise ValueError('Not a Mach-O file')
+    return records
 
 
 def main():
@@ -26,6 +107,9 @@ def main():
     runtime=app/'Contents/MacOS/GodotRuntime'
     resources=app/'Contents/Resources'
     output=ROOT/'private/macos-ci';output.mkdir(parents=True,exist_ok=True)
+    app_metadata=plistlib.loads((app/'Contents/Info.plist').read_bytes())
+    advertised_minimum=str(app_metadata['LSMinimumSystemVersion'])
+    minimum_limit=version_tuple(advertised_minimum)
     records=[]
     def run(name,command,expected=0,timeout=90):
         result=subprocess.run([str(x)for x in command],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=timeout,
@@ -38,8 +122,9 @@ def main():
         return text
     run('signature',['codesign','--verify','--deep','--strict',app])
     macho_magic={b'\xca\xfe\xba\xbe',b'\xbe\xba\xfe\xca',b'\xca\xfe\xba\xbf',b'\xbf\xba\xfe\xca',
-                 b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf'}
+                 b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf',b'\xce\xfa\xed\xfe',b'\xfe\xed\xfa\xce'}
     native_count=0
+    minimum_records=[];minimum_errors=[]
     frameworks=sorted((path for path in app.rglob('*.framework')if path.is_dir()and not path.is_symlink()),key=lambda path:len(path.parts),reverse=True)
     for index,framework in enumerate(frameworks,1):
         # Apple TN2206 / Code Signing Guide require bundle-context verification
@@ -54,6 +139,20 @@ def main():
         if not enclosing:run(f'nested-signature-{native_count}',['codesign','--verify','--strict',binary])
         if run(f'nested-architecture-{native_count}',['lipo','-archs',binary]).strip()!='arm64':
             raise RuntimeError('Non-arm64 code in application: '+str(binary.relative_to(app)))
+        relative=binary.relative_to(app).as_posix()
+        try:
+            commands=macho_minimum_versions(binary)
+            minimum_records.append({'path':relative,'commands':commands})
+            for command in commands:
+                if version_tuple(command['minimum_macos'])>minimum_limit:
+                    minimum_errors.append({'path':relative,'minimum_macos':command['minimum_macos'],
+                                           'advertised_minimum_macos':advertised_minimum})
+        except ValueError as error:minimum_errors.append({'path':relative,'error':str(error)})
+    deployment_report={'passed':not minimum_errors,'advertised_minimum_macos':advertised_minimum,
+                       'native_files_checked':len(minimum_records),'files':minimum_records,'errors':minimum_errors}
+    (output/'minimum_versions.json').write_text(json.dumps(deployment_report,indent=2),encoding='utf-8')
+    if minimum_errors:raise RuntimeError('Native minimum macOS versions exceed the application target or are invalid: '+json.dumps(minimum_errors))
+    records.append({'test':'all-native-minimum-macos-versions','passed':True,'minimum_macos':advertised_minimum,'files':len(minimum_records)})
     for binary in (launcher,runtime,resources/'native/bin/libft2synth.macos.arm64.dylib'):
         result=run('architecture-'+binary.name,['lipo','-archs',binary])
         if result.strip()!='arm64':raise RuntimeError('Only arm64 executables may be included')
@@ -108,6 +207,8 @@ def main():
     result={'passed':True,'platform':platform.platform(),'architecture':platform.machine(),
             'signed_arm64_native_files':native_count,
             'strict_framework_bundles':len(frameworks),
+            'minimum_macos':advertised_minimum,'native_minimum_versions_verified':True,
+            'native_minimum_version_files':len(minimum_records),
             'synthetic_engine_checks':report['checks'],
             'synthetic_extension_checks':extension_report['checks'],'editor_control_checks':editor_report['checks'],
             'tests':records,'game_data_used':False,
