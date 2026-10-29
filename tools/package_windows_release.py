@@ -8,7 +8,7 @@ import zipfile
 ROOT=Path(__file__).resolve().parents[1]
 TOP={'FT2-External.exe','FT2-External.pck','Launch-Windows.cmd','Game-Setup-Windows.cmd',
      'README.md','LICENSING.md','THIRD_PARTY_NOTICES.md','GODOT_LICENSES.txt',
-     'TINYSOUNDFONT_LICENSE.txt','engine_manifest.json','requirements.txt'}
+     'TINYSOUNDFONT_LICENSE.txt','engine_manifest.json','requirements.txt','COPYING-converter','CONVERTER_LICENSE.json'}
 
 
 def main():

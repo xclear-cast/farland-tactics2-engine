@@ -12,13 +12,13 @@ import re
 import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
-ROOT_FILES={'.gitignore','README.md','requirements.txt','build-requirements.txt','LICENSING.md','THIRD_PARTY_NOTICES.md'}
+ROOT_FILES={'.gitignore','README.md','requirements.txt','build-requirements.txt','LICENSING.md','THIRD_PARTY_NOTICES.md','COPYING-converter','CONVERTER_LICENSE.json'}
 GAME_FILES={'game/project.godot','game/pack_external.gd','game/write_notices.gd',
             'game/native/ft2_synth.c','game/native/ft2_synth.gdextension',
             'game/native/include/gdextension_interface.h','game/native/include/tsf.h'}
 TOOL_FILES={'audit_publish.py','build_external.py','build_macos_arm64.py',
             'convert_installation.py','import_content.py','package_converter.py',
-            'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py'}
+            'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py'}
 SOURCE_SUFFIXES={'.gd','.gdshader','.gdshaderinc','.uid'}
 FORBIDDEN_PARTS={'private','dist','.git','.venv','.godot','__pycache__','node_modules'}
 DATA_SUFFIXES={'.dat','.bin','.idx','.pal','.bmp','.png','.jpg','.jpeg','.wav','.mid',

@@ -96,7 +96,7 @@ ZIP 안의 폴더와 파일을 함께 보관하세요. 원작 EXE를 Windows 95�
 | --- | --- |
 | Windows x64 | 외부 데이터·모드·UI 검사 63개 통과 |
 | Linux x64 | 동일 검사 63개와 기본/커스텀/마을 화면 실행 통과 |
-| macOS arm64, M1 이상 | 전용 빌드 및 CI 준비 중. 성공한 Mac 실행 결과는 아직 기록되지 않음 |
+| macOS arm64, M1 이상 | 실제 Apple Silicon CI에서 빌드·앱 시작·내장 변환기·합성 모드 검사. 통과한 ZIP만 릴리스에 게시 |
 
 이 검사는 전체 캠페인의 모든 조합이나 원본과의 픽셀 동등성을 보장하지 않습니다.
 
@@ -242,8 +242,9 @@ Shift/Ctrl 상태를 CoreGraphics에서 한 번 읽도록 구현했습니다.
 Apple Silicon Mac에 Godot 및 Xcode Command Line Tools를 설치한 뒤
 `python3 tools/build_macos_arm64.py --godot /Applications/Godot.app/Contents/MacOS/Godot`
 로 휴대용 작업본을 만듭니다. 결과의 `Launch-Mac.command`를 실행합니다.
-**성공한 실제 Mac 빌드·실행 결과가 아직 기록되지 않았습니다.** CI 결과가 확인되면
-검증 범위를 갱신합니다. Developer ID 서명·공증과 로컬 ad-hoc 서명은 별개의 단계입니다.
+Mac 빌드의 구체적인 성공 여부와 검사 결과는 저장소의 Actions 실행 기록 및
+릴리스 검증 파일에서 확인하세요. 원작 캠페인 전체의 Mac 실기 동등성 검증과는
+구분합니다. Developer ID 서명·공증과 로컬 ad-hoc 서명은 별개의 단계입니다.
 인증서 없이 생성한 개발 패키지를 공증된 배포 앱으로 표시하지 않습니다.
 
 일반 사용자용 Mac 패키지는 내장 변환기를 사용합니다. 소스에서 개발할 때만 arm64

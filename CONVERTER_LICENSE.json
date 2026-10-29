@@ -1,0 +1,34 @@
+{
+  "schema": 1,
+  "component": "FT2 standalone installation converter",
+  "license": "GPL-2.0-only",
+  "copyright_notice": "Copyright (c) 2026 FT2 converter contributors",
+  "grant": "The newly authored converter code in the listed paths is distributed under GNU General Public License version 2 only, with no warranty. See COPYING-converter.",
+  "covered_paths": [
+    "tools/convert_installation.py",
+    "tools/import_content.py",
+    "tools/converters/**",
+    "tools/build_converter_binary.py",
+    "tools/update_font_charset.py",
+    "tools/package_converter_source.py",
+    "requirements.txt",
+    "build-requirements.txt"
+  ],
+  "excluded_from_this_grant": [
+    "game/**, including the independent engine and its own native adapters",
+    "third-party source and binaries, which retain their upstream notices",
+    "original game executables and all original game content",
+    "user-supplied fonts, audio and SoundFonts",
+    "generated caches containing user/original content",
+    "any rights the converter contributors do not hold"
+  ],
+  "unicorn": {
+    "version": "2.1.4",
+    "native_core_license": "GPL-2.0",
+    "upstream_readme": "https://github.com/unicorn-engine/unicorn/blob/2.1.4/README.md",
+    "upstream_copying": "https://github.com/unicorn-engine/unicorn/blob/2.1.4/COPYING",
+    "metadata_caution": "The Python package metadata says BSD License. That metadata is not treated as permission to redistribute the bundled native core under BSD.",
+    "source_archive_sha256": "00567a70e323f749b419cd86bee4f9115beab7ebba32194581c090cbb7c59cff"
+  },
+  "binary_distribution_policy": "Provide COPYING-converter, preserved third-party notices, and the matching FT2-Converter-Source.zip from the same release download location. The source archive contains the converter/build scripts and matching unmodified Unicorn and PyInstaller source archives. Do not publish a frozen converter without its corresponding source package."
+}

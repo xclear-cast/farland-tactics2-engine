@@ -8,7 +8,8 @@ import json
 def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
     root, destination = Path(root).resolve(), Path(destination).resolve()
     sources = [root/'tools/convert_installation.py', root/'tools/import_content.py',
-               root/'requirements.txt']
+               root/'requirements.txt',root/'COPYING-converter',root/'CONVERTER_LICENSE.json',
+               root/'LICENSING.md',root/'THIRD_PARTY_NOTICES.md']
     for source in (root/'tools/converters').rglob('*'):
         if not source.is_file():continue
         relative = source.relative_to(root/'tools/converters')

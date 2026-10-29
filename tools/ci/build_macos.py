@@ -104,6 +104,14 @@ def main():
     bridge=macos/'tools/ft2-convert/ft2-convert';bridge.parent.mkdir(parents=True,exist_ok=True)
     run(['xcrun','clang','-arch','arm64','-O2','-DFT2_CONVERTER_BRIDGE',ROOT/'tools/ci/macos_app_launcher.c','-o',bridge])
     run(['codesign','--force','--sign','-',bridge])
+    framework_checks=[]
+    for framework in sorted((path for path in app.rglob('*.framework')if path.is_dir()and not path.is_symlink()),key=lambda path:len(path.parts),reverse=True):
+        before=subprocess.run(['codesign','--verify','--deep','--strict',str(framework)],capture_output=True,text=True,encoding='utf-8',errors='replace')
+        framework_checks.append({'framework':framework.relative_to(app).as_posix(),'before_exit_code':before.returncode,'before_output':before.stdout+before.stderr})
+        run(['codesign','--force','--sign','-',framework])
+        run(['codesign','--verify','--deep','--strict',framework])
+    diagnostics=ROOT/'private/macos-ci';diagnostics.mkdir(parents=True,exist_ok=True)
+    (diagnostics/'framework_signing.json').write_text(json.dumps(framework_checks,indent=2),encoding='utf-8')
     for output in (destination,resources):
         shutil.copyfile(ROOT/'README.md',output/'README.md')
         shutil.copytree(ROOT/'mods',output/'mods',dirs_exist_ok=True)

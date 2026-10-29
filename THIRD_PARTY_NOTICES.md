@@ -53,12 +53,36 @@ AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER LIABILITY
 WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM, OUT OF OR IN
 CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE SOFTWARE.
 
+## Unicorn Engine 2.1.4
+
+Upstream: <https://github.com/unicorn-engine/unicorn/tree/2.1.4>
+
+Unicorn's upstream README identifies GPLv2 and links its `COPYING`. The Python
+wheel metadata's BSD label is not used to relicense the bundled native core.
+Frozen converters retain upstream `COPYING`, `COPYING.LGPL2`, `COPYING_GLIB` and
+the matching published source archive. The separate converter component grant
+is described in [LICENSING.md](LICENSING.md); it does not cover original game
+content or the independent engine.
+
+## PyInstaller
+
+PyInstaller is GPL version 2 or later with its upstream bootloader distribution
+exception. Preserve its full `COPYING.txt` and the notices for any runtime hooks
+and additional runtime modules. The matching PyInstaller source archive and the
+Windows `--no-cfg` bootloader build recipe accompany the converter source release.
+The exception does not change the licence of Unicorn's native library.
+
 ## Binary distributions and external dependencies
 
 Built packages include the Godot runtime's generated `GODOT_LICENSES.txt` and
 `TINYSOUNDFONT_LICENSE.txt`. Their dependency notices accompany the binary
-distribution. Python dependency licences are retained by their package managers;
-this source repository does not vendor Pillow or Unicorn wheels.
+distribution. Frozen converter packages also contain CPython, Pillow, Unicorn
+and PyInstaller notices under their internal `licenses` directory. Their installed
+distribution metadata are preserved. The source repository does not vendor wheels.
+
+Download the matching `FT2-Converter-Source.zip` from the same GitHub release as
+the binary. It contains converter/build source, preserved notices, matching
+Unicorn and PyInstaller source archives, SHA-256 records and rebuild instructions.
 
 No original game assets, operating-system fonts, CD tracks or SoundFont banks are
 included. User-created caches are outside this repository's redistribution scope.

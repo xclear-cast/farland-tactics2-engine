@@ -127,13 +127,14 @@ func _import() -> void:
 	_capture_fields()
 	if not DirAccess.dir_exists_absolute(str(configuration.source_root)):
 		status_label.text = "정품 설치 폴더를 먼저 선택하세요."; return
-	var tool := ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir().path_join("tools/convert_installation.py")
+	var bundled := OS.get_executable_path().get_base_dir().path_join("tools/ft2-convert/ft2-convert"+(".exe" if OS.get_name() == "Windows" else ""))
+	var tool := ProjectSettings.globalize_path("res://tools/convert_installation.py")
+	if not FileAccess.file_exists(tool): tool = ProjectSettings.globalize_path("res://").trim_suffix("/").get_base_dir().path_join("tools/convert_installation.py")
 	if not FileAccess.file_exists(tool): tool = OS.get_executable_path().get_base_dir().path_join("tools/convert_installation.py")
-	if not FileAccess.file_exists(tool): status_label.text = "캐시 생성 도구를 찾을 수 없습니다."; return
+	if not FileAccess.file_exists(bundled) and not FileAccess.file_exists(tool): status_label.text = "캐시 생성 도구를 찾을 수 없습니다."; return
 	var python := str(configuration.get("python",local_defaults.get("python","python" if OS.get_name() == "Windows" else "python3")))
 	var cache_parent := _cache_parent(str(configuration.content_root))
 	var arguments := _conversion_arguments(tool,configuration,cache_parent)
-	var bundled := OS.get_executable_path().get_base_dir().path_join("tools/ft2-convert/ft2-convert"+(".exe" if OS.get_name() == "Windows" else ""))
 	if FileAccess.file_exists(bundled):
 		python = bundled
 		arguments.remove_at(0) # The standalone converter already contains its Python entry point.
