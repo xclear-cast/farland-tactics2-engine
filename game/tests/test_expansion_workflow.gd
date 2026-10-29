@@ -126,6 +126,7 @@ func run() -> void:
 	if hero<0 or enemy<0:observations.errors=error_counts();write_report();quit(1);return
 	check(int(main.battle.units[hero].decode_u16(2))>=int(registry.base_race_count),"custom hero uses a new race definition")
 	check(main.battle.rules.xy(main.battle.units[hero])==Vector2i(2,2)and main.battle.rules.xy(main.battle.units[enemy])==Vector2i(3,2),"editor placement coordinates reach runtime")
+	for unused in range(3):await tick() # Present the new map before capturing its GPU frame.
 	if capture:
 		await process_frame;await RenderingServer.frame_post_draw
 		root.get_texture().get_image().save_png(output.path_join("private-own-map-original-tile-references.png"))
