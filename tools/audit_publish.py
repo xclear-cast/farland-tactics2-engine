@@ -12,7 +12,8 @@ import re
 import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
-ROOT_FILES={'.gitignore','README.md','requirements.txt','build-requirements.txt','LICENSING.md','THIRD_PARTY_NOTICES.md','COPYING-converter','CONVERTER_LICENSE.json','EXAMPLES_LICENSE'}
+ROOT_FILES={'.gitignore','README.md','requirements.txt','build-requirements.txt','LICENSING.md','THIRD_PARTY_NOTICES.md','COPYING-converter','CONVERTER_LICENSE.json','EXAMPLES_LICENSE',
+            'CONTRIBUTING.md','.github/PULL_REQUEST_TEMPLATE.md','.github/CODEOWNERS'}
 GAME_FILES={'game/project.godot','game/pack_external.gd','game/write_notices.gd',
             'game/native/ft2_synth.c','game/native/ft2_synth.gdextension',
             'game/native/include/gdextension_interface.h','game/native/include/tsf.h'}
@@ -122,17 +123,26 @@ def staged_paths():
         yield relative,data
 
 
+def tracked_paths():
+    for encoded in subprocess.check_output(['git','ls-files','-z'],cwd=ROOT).split(b'\0'):
+        if not encoded:continue
+        relative=encoded.decode('utf-8');path=ROOT/relative
+        if path.is_symlink():raise ValueError('Tracked publication symlink rejected: '+relative)
+        yield relative,path.read_bytes()
+
+
 def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--staged',action='store_true')
+    parser.add_argument('--tracked',action='store_true',help='Audit every tracked file for pull-request publication')
     parser.add_argument('--paths-file',type=Path,help='Write NUL-separated exact source paths for git add --pathspec-file-nul')
     parser.add_argument('--report',type=Path)
     args=parser.parse_args()
     rows=[];errors=[]
-    for relative,data in staged_paths()if args.staged else source_paths():
+    for relative,data in staged_paths()if args.staged else tracked_paths()if args.tracked else source_paths():
         errors.extend(inspect(relative,data));rows.append({'path':relative,'bytes':len(data),'sha256':sha(data)})
     if not rows:errors.append({'kind':'empty_source_selection'})
-    report={'status':'passed_source_boundary'if not errors else'failed','mode':'staged'if args.staged else'allowlist',
+    report={'status':'passed_source_boundary'if not errors else'failed','mode':'staged'if args.staged else'tracked'if args.tracked else'allowlist',
             'file_count':len(rows),'bytes':sum(row['bytes']for row in rows),'files':rows,'errors':errors,
             'original_game_content_allowed':False,'machine_private_data_allowed':False,
             'project_wide_licensing_review':'pending; this audit does not grant redistribution rights'}

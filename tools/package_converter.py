@@ -10,7 +10,7 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
     sources = [root/'tools/convert_installation.py', root/'tools/import_content.py',
                root/'tools/editor_mcp.py',
                root/'requirements.txt',root/'COPYING-converter',root/'CONVERTER_LICENSE.json',
-               root/'LICENSING.md',root/'THIRD_PARTY_NOTICES.md',root/'EXAMPLES_LICENSE']
+               root/'LICENSING.md',root/'THIRD_PARTY_NOTICES.md',root/'EXAMPLES_LICENSE',root/'CONTRIBUTING.md']
     sources += [root/'docs'/name for name in ('usage-guide.md',
                                              'MODDING.md','FORMATS.md','ASSET_POLICY.md',
                                              'EXPANSION_EDITOR.md','EXTENSION_RUNTIME_CONTRACT.md','EDITOR_DESIGN.md',

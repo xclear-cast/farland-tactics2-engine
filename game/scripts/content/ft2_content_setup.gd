@@ -19,6 +19,11 @@ var _editor_window_size := Vector2i.ZERO
 var _editor_scale_size := Vector2i.ZERO
 var _editor_min_size := Vector2i.ZERO
 var _editor_scale_mode := Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+var _editor_scale_aspect := Window.CONTENT_SCALE_ASPECT_KEEP
+var _editor_scale_factor := 1.0
+var _editor_window_mode := Window.MODE_WINDOWED
+var _editor_linking_source:=false
+var create_button:Button
 
 func _ready() -> void:
 	Engine.max_fps = 60
@@ -94,7 +99,7 @@ func _build_ui() -> void:
 	var actions := HBoxContainer.new(); box.add_child(actions)
 	import_button = Button.new(); import_button.text = "게임 준비하기"; import_button.pressed.connect(_import); actions.add_child(import_button)
 	connect_button = Button.new(); connect_button.text = "연결하고 실행"; connect_button.pressed.connect(_connect_game); actions.add_child(connect_button)
-	var create := Button.new(); create.text = "확장팩 만들기"; create.pressed.connect(_open_editor); actions.add_child(create)
+	create_button=Button.new();create_button.text="확장팩 만들기";create_button.pressed.connect(_open_editor);actions.add_child(create_button)
 	status_label = Label.new(); status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; status_label.text = str(configuration.get("last_error","정품 데이터와 개인 캐시는 엔진 배포물에 포함되지 않습니다.")); box.add_child(status_label)
 
 func _browse(field: LineEdit, select_file: bool = false, filters: PackedStringArray = []) -> void:
@@ -121,16 +126,22 @@ func _capture_fields() -> void:
 
 func _connect_game() -> void:
 	_capture_fields()
-	var result := _mount()
+	var result := FT2Content.activate(str(configuration.get("content_root","")),str(configuration.get("source_root","")),[]) if _editor_linking_source else _mount()
 	if not result.ok: status_label.text = result.error; return
 	configuration.erase("last_error")
 	var file := FileAccess.open(config_path,FileAccess.WRITE)
 	if file == null: status_label.text = "연결 설정을 저장할 수 없습니다."; return
 	file.store_string(JSON.stringify(configuration,"\t")); file.close()
+	if _editor_linking_source and is_instance_valid(_editor):
+		_editor.configure(load("res://scripts/data/ft2_data.gd").new())
+		_return_to_editor()
+		return
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
 
 func _open_editor() -> void:
-	if is_instance_valid(_editor): return
+	if is_instance_valid(_editor):
+		if _editor_linking_source:_return_to_editor()
+		return
 	_capture_fields()
 	var store = null
 	if not str(configuration.get("content_root","")).is_empty() and not str(configuration.get("source_root","")).is_empty():
@@ -140,24 +151,51 @@ func _open_editor() -> void:
 	_editor.configure(store)
 	_editor.closed.connect(_close_editor)
 	_editor.play_requested.connect(_test_editor_project)
+	_editor.source_connection_requested.connect(_begin_editor_source_connection)
 	_editor_window_size = get_window().size
 	_editor_scale_size = get_window().content_scale_size
 	_editor_min_size = get_window().min_size
 	_editor_scale_mode = get_window().content_scale_mode
-	get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
-	get_window().content_scale_size = Vector2i.ZERO
+	_editor_scale_aspect = get_window().content_scale_aspect
+	_editor_scale_factor = get_window().content_scale_factor
+	_editor_window_mode = get_window().mode
+	get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	get_window().content_scale_aspect = Window.CONTENT_SCALE_ASPECT_EXPAND
+	get_window().content_scale_factor = 1.0
+	get_window().content_scale_size = Vector2i(1280,840)
 	get_window().min_size = Vector2i(1120,720)
 	get_window().size = Vector2i(1280,840)
 	hide();get_parent().add_child(_editor)
 
 func _close_editor() -> void:
-	if is_instance_valid(_editor): _editor.queue_free()
+	if is_instance_valid(_editor):
+		if _editor.has_method("prepare_close"):_editor.prepare_close()
+		_editor.queue_free()
 	_editor = null
 	get_window().min_size = _editor_min_size
 	get_window().content_scale_mode = _editor_scale_mode
+	get_window().content_scale_aspect = _editor_scale_aspect
+	get_window().content_scale_factor = _editor_scale_factor
+	get_window().mode = _editor_window_mode
 	get_window().content_scale_size = _editor_scale_size
 	get_window().size = _editor_window_size
 	show()
+
+func _begin_editor_source_connection(browse:bool=true)->void:
+	if not is_instance_valid(_editor):return
+	_editor_linking_source=true
+	_editor.hide();show()
+	connect_button.text="연결하고 에디터로 돌아가기"
+	create_button.text="편집기로 돌아가기"
+	status_label.text="DATA·MAP·SPRITE·FTO_O.EXE가 있는 정품 폴더를 선택하세요. 처음 연결하면 게임 준비하기를 누르세요."
+	if browse:_browse(source_field)
+
+func _return_to_editor()->void:
+	_editor_linking_source=false
+	connect_button.text="연결하고 실행"
+	create_button.text="확장팩 만들기"
+	hide()
+	if is_instance_valid(_editor):_editor.show()
 
 func _test_editor_project(folder: String) -> void:
 	var decoder := JSON.new()

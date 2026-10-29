@@ -6,6 +6,7 @@ import json
 import os
 import platform
 import plistlib
+import re
 import struct
 import subprocess
 import sys
@@ -183,14 +184,25 @@ def main():
     baseline_report=json.loads((baseline_output/'result.json').read_text(encoding='utf-8'))
     if not baseline_report.get('passed')or baseline_report.get('real_cache_checked')is not False or baseline_report.get('original_data_embedded')is not False:
         raise RuntimeError('Content-free editor baseline regression did not pass')
+    scaling_output=output/'editor-scaling';scaling_output.mkdir(parents=True,exist_ok=True)
+    run('editor-display-scaling',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_editor_scaling.gd','--',f'--scaling-output={scaling_output}'])
+    scaling_report=json.loads((scaling_output/'result.json').read_text(encoding='utf-8'))
+    if not scaling_report.get('passed')or scaling_report.get('original_data_used')is not False:
+        raise RuntimeError('Content-free editor display scaling did not pass')
     run('no-original-data',[launcher,'--headless','--audio-driver','Dummy','--','--check-content',f'--engine-config={output/"absent-connection.json"}'],expected=2)
     if args.gui:
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
     run('graphics-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.test_graphics'])
     run('scenario-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.scenario_support.test_scenario'])
     run('table-audio-save-parser-fixtures',[sys.executable,ROOT/'tools/converters/tables_audio_support/test_conversion.py'])
-    run('editor-mcp-protocol-and-live-bridge',[sys.executable,ROOT/'tools/tests/test_editor_mcp.py','-v'],
-        extra_env={'FT2_BRIDGE_GODOT':str(runtime)})
+    mcp_suite=run('editor-mcp-protocol-and-live-bridge',
+                  [sys.executable,'-m','unittest','discover','-s','tools/tests','-p','test_editor_mcp.py','-v'],
+                  extra_env={'FT2_BRIDGE_GODOT':str(runtime)})
+    if (not re.search(r'(?m)^Ran 4 tests in [0-9.]+s\s*$',mcp_suite)
+            or 'OK'not in mcp_suite.splitlines()
+            or re.search(r'\bskipped\b',mcp_suite,re.IGNORECASE)):
+        raise RuntimeError('MCP protocol/live TCP suite must execute all four tests without skips')
+    records.append({'test':'editor-mcp-live-tcp-suite-executed','passed':True,'tests':4})
     run('distributed-converter-help',[sys.executable,'-I',resources/'tools/convert_installation.py','--help'])
     converter=app/'Contents/MacOS/tools/ft2-convert/ft2-convert'
     architecture=run('converter-architecture',['lipo','-archs',converter])
@@ -233,7 +245,9 @@ def main():
             'synthetic_engine_checks':report['checks'],
             'synthetic_extension_checks':extension_report['checks'],'editor_control_checks':editor_report['checks'],
             'editor_baseline_synthetic_checks':baseline_report['checks'],
+            'editor_scaling_checks':scaling_report['checks'],
             'editor_mcp_tools':14,'editor_mcp_stdio_verified':True,
+            'editor_mcp_live_tcp_tests':4,
             'tests':records,'game_data_used':False,
             'gui_first_setup_verified':args.gui,'real_gameplay_verified':False,
             'scope':'Native arm64 build, app startup/setup, content-free package, synthetic loader/v2 definitions/editor/parser/font/emulator validation. No original game or complete campaign validation.'}

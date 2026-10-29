@@ -3,6 +3,7 @@ extends Control
 ## Native forms for schema2 expansion authoring. Original resources are references.
 signal closed
 signal play_requested(folder: String)
+signal source_connection_requested
 
 const Project=preload("res://scripts/editor/ft2_expansion_project.gd")
 var project=Project.new()
@@ -56,16 +57,32 @@ var external_preview_enabled:=true
 var _preview_pid:=-1
 var _preview_log:="user://editor_preview.log"
 var _preview_error:=""
+var _ui_scale_option:OptionButton
+var _ui_scale_label:Label
+var _effective_ui_scale:=1.0
+var _scale_updating:=false
+var _scale_suspended:=false
+var _scale_window:Window
+var _windowed_mode:=Window.MODE_WINDOWED
+var _windowed_size:=Vector2i(1280,840)
+var _windowed_position:=Vector2i.ZERO
 const EditorBridge=preload("res://scripts/editor/ft2_editor_bridge.gd")
 const MapView=preload("res://scripts/editor/ft2_editor_map_view.gd")
 const StoryView=preload("res://scripts/editor/ft2_editor_story_view.gd")
 
 func _ready() -> void:
 	_build();_refresh_all();_reset_history()
+	_scale_window=get_window()
+	_scale_window.size_changed.connect(_apply_ui_scale)
+	_apply_ui_scale()
 
 func configure(source_data=null) -> void:
+	if _built:_commit_pending()
 	data=source_data;project.source_data=data
-	if _built:_refresh_all();_reset_history()
+	if _built:
+		_refresh_all()
+		if _history.is_empty():_reset_history()
+		_refresh_workbench()
 
 func load_project(folder: String) -> Dictionary:
 	var result: Dictionary=project.load_project(folder)
@@ -137,6 +154,8 @@ func _build() -> void:
 	_heading=_text(top,"나의 첫 확장팩");_heading.size_flags_horizontal=Control.SIZE_EXPAND_FILL
 	_heading.clip_text=true;_heading.text_overrun_behavior=TextServer.OVERRUN_TRIM_ELLIPSIS
 	_connection=_text(top,"정품 데이터 미연결",12)
+	_button(top,"connect_original","원작 데이터 연결",_request_source_connection)
+	_button(top,"open_original_folder","원작 폴더 열기",_open_original_folder)
 	var toolbar:=HBoxContainer.new();toolbar.add_theme_constant_override("separation",5);box.add_child(toolbar)
 	_button(toolbar,"new","새 프로젝트",_request_new).tooltip_text="새 확장팩 프로젝트"
 	_button(toolbar,"open","열기",_request_open)
@@ -162,6 +181,12 @@ func _build() -> void:
 	_build_ai_tab()
 	var footer:=HBoxContainer.new();box.add_child(footer)
 	status=_text(footer,"목록에서 항목을 선택하세요. 원작 항목은 복제해서 편집합니다.",12);status.size_flags_horizontal=Control.SIZE_EXPAND_FILL
+	status.autowrap_mode=TextServer.AUTOWRAP_WORD_SMART;status.custom_minimum_size.x=200
+	_ui_scale_option=OptionButton.new()
+	for title in ["자동 확대","100%","125%","150%","175%","200%"]:_ui_scale_option.add_item(title)
+	footer.add_child(_ui_scale_option);_ui_scale_option.item_selected.connect(func(_i):_apply_ui_scale())
+	_ui_scale_label=_text(footer,"100%",12)
+	_button(footer,"fullscreen","전체 화면  F11",_toggle_fullscreen)
 	_built=true;_chrome_ready=true
 	for key in fields:
 		var control=fields[key]
@@ -759,6 +784,7 @@ func _refresh_workbench()->void:
 	_heading.text="  ·  "+str(project.descriptor.get("name","새 프로젝트"))+("  ● 수정됨"if _dirty else "")
 	_connection.text="정품 기준값 연결됨" if not project.original_catalog("characters").is_empty() else "정품 미연결 · 원본값 확인 불가"
 	_connection.modulate=Color("92c7ae") if data!=null else Color("c5a46c")
+	if buttons.has("open_original_folder"):buttons.open_original_folder.disabled=data==null
 	for kind in Project.KINDS:
 		var record:=_selected_record(kind)
 		_record_title[kind].text=str(record.get("name",record.get("id","항목 없음")))
@@ -864,6 +890,7 @@ func _confirm_discard(action:Callable)->void:
 
 func _unhandled_key_input(event:InputEvent)->void:
 	if not event is InputEventKey or not event.pressed or event.echo:return
+	if event.keycode==KEY_F11:_toggle_fullscreen();get_viewport().set_input_as_handled();return
 	if not (event.ctrl_pressed or event.meta_pressed):return
 	match event.keycode:
 		KEY_S:_commit_pending();_save_clicked()
@@ -980,5 +1007,50 @@ func _process(delta:float)->void:
 		_bridge_clock=0;_update_mcp_status()
 		if buttons.has("stop_play"):buttons.stop_play.disabled=not (_preview_pid>0 and OS.is_process_running(_preview_pid))
 func _exit_tree()->void:
+	prepare_close()
 	if bridge!=null:bridge.stop()
 	stop_preview()
+
+func ui_scale_percent()->float:return _effective_ui_scale*100.0
+
+func _apply_ui_scale()->void:
+	if _scale_suspended or _scale_updating or not is_inside_tree():return
+	var window:=get_window()
+	if window.size.x<=0 or window.size.y<=0:return
+	_scale_updating=true
+	var physical:=Vector2(window.size)
+	var desired:=minf(physical.x/1280.0,physical.y/840.0)
+	if _ui_scale_option!=null and _ui_scale_option.selected>0:desired=[1.0,1.25,1.5,1.75,2.0][_ui_scale_option.selected-1]
+	var limit:=minf(physical.x/1280.0,physical.y/720.0)
+	_effective_ui_scale=clampf(desired,.5,maxf(.5,limit))
+	var logical:=Vector2i(ceili(physical.x/_effective_ui_scale),ceili(physical.y/_effective_ui_scale))
+	window.content_scale_mode=Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
+	window.content_scale_aspect=Window.CONTENT_SCALE_ASPECT_EXPAND
+	window.content_scale_factor=1.0
+	if window.content_scale_size!=logical:window.content_scale_size=logical
+	if _ui_scale_label!=null:_ui_scale_label.text="%d%%"%roundi(ui_scale_percent())+(" · 화면 맞춤"if _effective_ui_scale<desired-.01 else "")
+	_scale_updating=false
+
+func _toggle_fullscreen()->void:
+	var window:=get_window()
+	if window.mode in [Window.MODE_FULLSCREEN,Window.MODE_EXCLUSIVE_FULLSCREEN]:
+		window.mode=_windowed_mode
+		if _windowed_mode==Window.MODE_WINDOWED:window.size=_windowed_size;window.position=_windowed_position
+	else:
+		_windowed_mode=window.mode;_windowed_size=window.size;_windowed_position=window.position
+		window.mode=Window.MODE_FULLSCREEN
+	_apply_ui_scale.call_deferred()
+
+func prepare_close()->void:
+	_scale_suspended=true
+	if is_instance_valid(_scale_window)and _scale_window.size_changed.is_connected(_apply_ui_scale):_scale_window.size_changed.disconnect(_apply_ui_scale)
+
+func _request_source_connection()->void:
+	_commit_pending()
+	_stop_mcp()
+	source_connection_requested.emit()
+
+func _open_original_folder()->void:
+	if data!=null and DirAccess.dir_exists_absolute(str(data.source_root)):
+		OS.shell_open(str(data.source_root))
+	else:_status("원작 데이터 연결을 눌러 정품 폴더를 먼저 선택하세요.",true)

@@ -11,12 +11,13 @@ on:
       - 'mods/**'
       - 'requirements.txt'
       - 'README.md'
+  pull_request:
 
 permissions:
   contents: read
 
 concurrency:
-  group: macos-arm64-${{ github.ref }}
+  group: macos-arm64-${{ github.event.pull_request.number || 'push' }}-${{ github.head_ref || github.ref }}
   cancel-in-progress: true
 
 jobs:
@@ -39,6 +40,8 @@ jobs:
           python -c 'import platform; assert platform.machine() == "arm64"'
       - name: Install converter dependencies
         run: python -m pip install -r requirements.txt -r build-requirements.txt
+      - name: Audit tracked public sources
+        run: python tools/audit_publish.py --tracked
       - name: Fetch verified official Godot
         run: |
           python tools/ci/fetch_godot_macos.py --destination "$RUNNER_TEMP/godot"

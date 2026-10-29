@@ -5,6 +5,8 @@ Copyright (c) 2026 FT2 expansion, example and documentation contributors
 This licence applies only to the contributors' newly authored material in these
 explicit paths:
 
+- CONTRIBUTING.md
+- .github/PULL_REQUEST_TEMPLATE.md
 - game/scripts/editor/**
 - game/scripts/extensions/**
 - game/tests/test_extension_editor.gd
@@ -12,6 +14,7 @@ explicit paths:
 - game/tests/test_expansion_workflow.gd
 - game/tests/test_editor_workbench.gd
 - game/tests/test_editor_preview.gd
+- game/tests/test_editor_source_link.gd
 - game/tests/test_editor_baseline.gd
 - docs/MODDING.md
 - docs/FORMATS.md
