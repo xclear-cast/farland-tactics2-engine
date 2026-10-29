@@ -27,19 +27,9 @@
   ],
   "files": [
     {
-      "path": "docs/usage-guide.gif",
-      "bytes": 617603,
-      "sha256": "b5b380f9026d0db84a457406738c2edc9d23d33b903e5df71a22d5773add14b9"
-    },
-    {
       "path": "docs/usage-guide.mp4",
       "bytes": 412291,
       "sha256": "6c49d2d31e34c74bbb73d6889337a0b95b19f08bc85d9194103754c91da288cc"
-    },
-    {
-      "path": "docs/usage-guide-mac.gif",
-      "bytes": 373023,
-      "sha256": "50028b1e91a5660b5a9c11e1de9924007bb7b02c153c7d6a0a335b9edc56ef18"
     },
     {
       "path": "docs/usage-guide-mac.mp4",

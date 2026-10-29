@@ -1,4 +1,4 @@
-"""Encode the self-authored setup tutorial frames as a small GIF and MP4."""
+"""Encode the self-authored setup tutorial frames as MP4."""
 from pathlib import Path
 import argparse
 import hashlib
@@ -19,9 +19,8 @@ def main():
     source=str(args.frames/'frame_%04d.png')
     common=[args.ffmpeg,'-y','-loglevel','error','-framerate','4','-i',source]
     subprocess.run([*common,'-vf','fps=12,format=yuv420p','-c:v','libx264','-preset','medium','-crf','20','-movflags','+faststart',str(args.output/'usage-guide.mp4')],check=True)
-    subprocess.run([*common,'-vf','split[s0][s1];[s0]palettegen=max_colors=128:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4','-loop','0',str(args.output/'usage-guide.gif')],check=True)
     rows=[]
-    for name in ('usage-guide.gif','usage-guide.mp4'):
+    for name in ('usage-guide.mp4',):
         path=args.output/name
         rows.append({'path':'docs/'+name,'bytes':path.stat().st_size,'sha256':hashlib.sha256(path.read_bytes()).hexdigest()})
     report={'schema':1,'seconds':28,'resolution':[960,720],'instructional_example':True,'actual_setup_ui_used':True,

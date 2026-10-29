@@ -5,8 +5,6 @@
 
 ## Windows용 파일: 압축 풀기부터 실행까지
 
-![실제 가상 파일 관리자와 앱 창을 순서대로 보여 주는 Windows 파일 안내](usage-guide.gif)
-
 [Windows 순서 MP4 영상](usage-guide.mp4)
 
 1. 받은 `FT2-Windows-x64.zip`을 **전부** 압축 풉니다.
@@ -21,8 +19,6 @@ Windows 파일 목록은 호스트 PC가 아닌 격리된 WSL 가상화면의 �
 촬영했습니다. Windows 탐색기와 창 모양은 다를 수 있지만 빨간 네모의 파일 이름은 같습니다.
 
 ## Mac M1 이상: 실제 Finder 화면
-
-![실제 Mac Finder에서 ZIP과 앱을 찾는 순서](usage-guide-mac.gif)
 
 [Mac 순서 MP4 영상](usage-guide-mac.mp4)
 

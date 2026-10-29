@@ -24,13 +24,9 @@
 
 ### 실제 폴더 화면에서 빨간 네모만 따라 하세요
 
-![실제 폴더 캡처로 ZIP과 Windows 실행 파일을 찾는 순서](docs/usage-guide.gif)
-
 [Windows 동영상](docs/usage-guide.mp4) · [사진 순서를 글로 보기](docs/usage-guide.md)
 
 Mac은 실제 Finder 화면으로 보세요.
-
-![실제 Mac Finder에서 ZIP과 앱을 찾는 순서](docs/usage-guide-mac.gif)
 
 [Mac 동영상](docs/usage-guide-mac.mp4)
 

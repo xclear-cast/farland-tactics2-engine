@@ -102,15 +102,12 @@ def main():
                            'crop':list(crop),'masks':frame.get('masks',[]),'red_boxes':boxes,'seconds':duration,'caption':caption})
     listing=out/'segments.txt'
     listing.write_text(''.join("file '"+path.as_posix()+"'\n"for path in segment_paths),encoding='utf-8')
-    mp4=out/(args.prefix+'.mp4');gif=out/(args.prefix+'.gif')
+    mp4=out/(args.prefix+'.mp4')
     run([args.ffmpeg,'-y','-loglevel','error','-f','concat','-safe','0','-i',str(listing),'-map_metadata','-1','-c','copy','-movflags','+faststart',str(mp4)],out/'concat.log')
-    run([args.ffmpeg,'-y','-loglevel','error','-i',str(mp4),'-vf',
-         'fps=3,split[s0][s1];[s0]palettegen=max_colors=192:stats_mode=diff[p];[s1][p]paletteuse=dither=bayer:bayer_scale=4',
-         '-map_metadata','-1','-loop','0',str(gif)],out/'gif.log')
     report={'schema':1,'capture_kind':'actual-window-screenshots','seconds':seconds,'canvas':[width,height],
             'source_captures_modified':False,'screenshots_cropped_and_privacy_masked':True,
             'game_art_or_game_data_shown':False,'privacy_reviewed':bool(manifest.get('privacy_reviewed',False)),'steps':provenance,
-            'files':[{'name':p.name,'bytes':p.stat().st_size,'sha256':sha(p)}for p in (gif,mp4)]}
+            'files':[{'name':p.name,'bytes':p.stat().st_size,'sha256':sha(p)}for p in (mp4,)]}
     (out/(args.prefix+'.json')).write_text(json.dumps(report,ensure_ascii=False,indent=2),encoding='utf-8')
     print(json.dumps({key:value for key,value in report.items()if key!='steps'},ensure_ascii=False))
 
