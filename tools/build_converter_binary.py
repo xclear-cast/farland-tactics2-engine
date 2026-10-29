@@ -16,6 +16,7 @@ import subprocess
 import sys
 import uuid
 import urllib.request
+import tarfile
 
 
 def _sha(path):
@@ -36,10 +37,66 @@ def _assert_input(path):
     if not path.is_file()or path.is_symlink():raise ValueError('Missing or unsafe converter input: '+str(path))
 
 
+def _compiler_environment():
+    """Obtain MSVC environment for this build process without changing settings."""
+    locator=Path(os.environ.get('ProgramFiles(x86)','C:/Program Files (x86)'))/'Microsoft Visual Studio/Installer/vswhere.exe'
+    if not locator.is_file():raise RuntimeError('Visual Studio C++ Build Tools are required for the Windows Unicorn-compatible bootloader')
+    installation=subprocess.check_output([str(locator),'-latest','-products','*','-requires','Microsoft.VisualStudio.Component.VC.Tools.x86.x64','-property','installationPath'],text=True).strip()
+    script=Path(installation)/'VC/Auxiliary/Build/vcvars64.bat'
+    if not script.is_file():raise RuntimeError('MSVC vcvars64.bat was not found')
+    # Compiler activation is read only and scoped to this child process.
+    command=f'cmd.exe /d /s /c ""{script}" >nul && set"'
+    completed=subprocess.run(command,capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=60)
+    if completed.returncode:raise RuntimeError('Could not activate MSVC build environment')
+    environment={}
+    for line in completed.stdout.splitlines():
+        if '='in line and not line.startswith('='):
+            key,value=line.split('=',1);environment[key]=value
+    environment['PYTHONUTF8']='1'
+    return environment
+
+
+def _windows_bootloader(root):
+    """Use PyInstaller's documented --no-cfg build for Unicorn's JIT/longjmp.
+
+    The compiler option affects this converter executable only. No system
+    mitigation, registry, or installed Python/PyInstaller setting is changed.
+    """
+    version=importlib.metadata.version('pyinstaller')
+    directory=root/'private/build_converter_bootloader'/version
+    source=directory/('pyinstaller-'+version)
+    bootloader=source/'PyInstaller/bootloader/Windows-64bit-intel/run.exe'
+    marker=directory/'bootloader.json'
+    if marker.is_file()and bootloader.is_file():
+        document=json.loads(marker.read_text(encoding='utf-8'))
+        if document.get('cfg_disabled')is True and document.get('sha256')==_sha(bootloader):return source
+    directory.mkdir(parents=True,exist_ok=True)
+    with urllib.request.urlopen(f'https://pypi.org/pypi/pyinstaller/{version}/json',timeout=30)as response:metadata=json.load(response)
+    artifact=next(item for item in metadata['urls']if item['packagetype']=='sdist')
+    archive=directory/artifact['filename']
+    if not archive.is_file()or _sha(archive)!=artifact['digests']['sha256']:
+        with urllib.request.urlopen(artifact['url'],timeout=60)as response:archive.write_bytes(response.read())
+    if _sha(archive)!=artifact['digests']['sha256']:raise RuntimeError('PyInstaller source archive hash mismatch')
+    if not source.exists():
+        with tarfile.open(archive)as package:package.extractall(directory,filter='data')
+    environment=_compiler_environment()
+    with (directory/'build.log').open('wb')as log:
+        result=subprocess.run([sys.executable,str(source/'bootloader/waf'),'all','--no-cfg'],cwd=source/'bootloader',
+                              env=environment,stdout=log,stderr=subprocess.STDOUT,timeout=900)
+    if result.returncode or not bootloader.is_file():raise RuntimeError('Unicorn-compatible bootloader build failed; inspect '+str(directory/'build.log'))
+    marker.write_text(json.dumps({'version':version,'cfg_disabled':True,'sha256':_sha(bootloader),
+        'source_url':artifact['url'],'source_sha256':artifact['digests']['sha256'],
+        'documentation':'https://pyinstaller.org/en/stable/common-issues-and-pitfalls.html#windows-executables-and-control-flow-guard-cfg'},indent=2),encoding='utf-8')
+    return source
+
+
 def _frozen_entry():
-    return '''import json, sys
+    return '''import json, sys, os
 if sys.argv[1:] == ['--self-test']:
     try:
+        def trace(step):
+            if os.environ.get('FT2_CONVERTER_TEST_TRACE') == '1': print('FT2_CONVERTER_TEST '+step, file=sys.stderr, flush=True)
+        trace('imports')
         import codecs
         from pathlib import Path
         from importlib.metadata import version
@@ -47,16 +104,23 @@ if sys.argv[1:] == ['--self-test']:
         from unicorn import Uc, UC_ARCH_X86, UC_MODE_32
         from unicorn.x86_const import UC_X86_REG_EAX
         import convert_installation
+        trace('pillow')
         image = Image.new('L', (2, 2), 123)
         assert image.getpixel((1, 1)) == 123
+        trace('codec')
         assert codecs.decode(bytes([0xb0, 0xa1]), 'cp949') == chr(0xac00)
+        trace('unicorn-open')
         emulator = Uc(UC_ARCH_X86, UC_MODE_32)
+        trace('unicorn-map')
         emulator.mem_map(0x1000, 0x1000)
         code = bytes([0xb8, 42, 0, 0, 0, 0x40])
         emulator.mem_write(0x1000, code)
+        trace('unicorn-run')
         emulator.emu_start(0x1000, 0x1000 + len(code), count=16)
+        trace('unicorn-result')
         assert emulator.reg_read(UC_X86_REG_EAX) == 43
         stamp = convert_installation.pipeline_identity()
+        trace('stamp')
         catalog = Path(sys._MEIPASS) / 'converters' / 'font_charset.json'
         assert 215 in json.loads(catalog.read_text(encoding='utf-8'))['codepoints']
         print(json.dumps({'status':'self-test-passed', 'frozen':bool(getattr(sys,'frozen',False)),
@@ -159,6 +223,7 @@ def build_converter(root: Path,destination: Path) -> Path:
         _assert_input(path)
     for path in (tools/'converters').rglob('*.py'):_assert_input(path)
     pipeline=_pipeline_identity(root)
+    bootloader_source=_windows_bootloader(root)if os.name=='nt'else None
     work=root/'private/build_converter'/uuid.uuid4().hex
     work.mkdir(parents=True)
     stamp=work/'converter_build.json'
@@ -171,8 +236,11 @@ def build_converter(root: Path,destination: Path) -> Path:
     specification.write_text(_specification(root,stamp,entry,licenses),encoding='utf-8',newline='\n')
     command=[sys.executable,'-m','PyInstaller','--noconfirm','--clean','--distpath',str(work/'dist'),
              '--workpath',str(work/'work'),str(specification)]
+    environment=dict(os.environ,PYTHONUTF8='1')
+    if bootloader_source:
+        environment['PYTHONPATH']=str(bootloader_source)+(os.pathsep+environment['PYTHONPATH']if environment.get('PYTHONPATH')else'')
     with (work/'build.log').open('wb')as log:
-        result=subprocess.run(command,cwd=root,env=dict(os.environ,PYTHONUTF8='1'),stdout=log,stderr=subprocess.STDOUT,timeout=900)
+        result=subprocess.run(command,cwd=root,env=environment,stdout=log,stderr=subprocess.STDOUT,timeout=900)
     if result.returncode:raise RuntimeError('Converter freeze failed; inspect '+str(work/'build.log'))
     stage=work/'dist/ft2-convert'
     suffix='.exe'if os.name=='nt'else''
@@ -190,6 +258,7 @@ def build_converter(root: Path,destination: Path) -> Path:
             'pyinstaller':importlib.metadata.version('pyinstaller'),
             'pillow':importlib.metadata.version('pillow'),'unicorn':importlib.metadata.version('unicorn'),
             'original_game_data_included':False,'requires_python_installation':False,
+            'windows_unicorn_compatible_bootloader':bool(bootloader_source),
             'files':sum(1 for path in stage.rglob('*')if path.is_file()),
             'bytes':sum(path.stat().st_size for path in stage.rglob('*')if path.is_file())}
     (stage/'converter_build_result.json').write_text(json.dumps(report,indent=2),encoding='utf-8',newline='\n')

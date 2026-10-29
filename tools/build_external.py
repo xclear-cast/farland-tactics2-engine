@@ -64,6 +64,8 @@ def main():
         shutil.copyfile(ROOT/'game/native/bin'/name,target)
     converter_rows=copy_converter_payload(ROOT,destination)
     shutil.copyfile(ROOT/'README.md',destination/'README.md')
+    for name in ('LICENSING.md','THIRD_PARTY_NOTICES.md'):
+        if(ROOT/name).is_file():shutil.copyfile(ROOT/name,destination/name)
     run(['--path',str(ROOT/'game'),'--script','res://write_notices.gd','--',str(destination/'GODOT_LICENSES.txt')],logs/'licenses.log')
     tsf=(ROOT/'game/native/include/tsf.h').read_text(encoding='utf-8').split('LICENSE (MIT)',1)[1].split('*/',1)[0]
     (destination/'TINYSOUNDFONT_LICENSE.txt').write_text('MIT License\n'+tsf,encoding='utf-8')

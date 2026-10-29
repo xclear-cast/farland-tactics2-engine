@@ -68,7 +68,7 @@ def main():
          '-I',ROOT/'game/native',ROOT/'game/native/ft2_synth.c','-framework','CoreGraphics','-o',library])
     run(['codesign','--force','--sign','-',library])
     if run(['lipo','-archs',library]).strip()!='arm64':raise RuntimeError('Native module is not arm64 only')
-    run([args.godot,'--headless','--path',ROOT/'game','--editor','--import','--quit'])
+    run([args.godot,'--headless','--audio-driver','Dummy','--path',ROOT/'game','--editor','--import','--quit'])
     app=destination/APP_NAME
     macos=app/'Contents/MacOS';resources=app/'Contents/Resources'
     macos.mkdir(parents=True,exist_ok=True);resources.mkdir(parents=True,exist_ok=True)

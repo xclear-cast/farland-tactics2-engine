@@ -1,2 +1,2 @@
 # Native build tools only; install alongside requirements.txt.
-PyInstaller>=6.16,<7
+PyInstaller==6.22.3

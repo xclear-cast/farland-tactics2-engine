@@ -2,6 +2,7 @@
 from pathlib import Path
 import hashlib
 import shutil
+import json
 
 
 def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
@@ -36,7 +37,17 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
         rows.append({'path':relative.as_posix(),'bytes':target.stat().st_size,
                      'sha256':hashlib.sha256(target.read_bytes()).hexdigest()})
     expected={row['path'] for row in rows}
+    bundle=tools/'ft2-convert'
+    if bundle.is_dir():
+        marker=bundle/'converter_build_result.json'
+        stamp=bundle/'_internal/converter_build.json'
+        if not marker.is_file()or not stamp.is_file():raise ValueError('Bundled converter is incomplete')
+        report=json.loads(marker.read_text(encoding='utf-8'))
+        identity=json.loads(stamp.read_text(encoding='utf-8'))
+        if report.get('kind')!='standalone-converter-binary' or report.get('original_game_data_included')is not False or report.get('requires_python_installation')is not False or report.get('pipeline_sha256')!=identity.get('pipeline_sha256'):
+            raise ValueError('Bundled converter identity/scope does not match its build record')
     for path in tools.rglob('*'):
+        if bundle.is_dir()and path.is_relative_to(bundle):continue
         if path.is_file() and path.relative_to(destination).as_posix() not in expected:
             raise ValueError('Unexpected file in converter release payload: '+str(path))
     return rows

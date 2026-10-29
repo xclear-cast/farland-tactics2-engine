@@ -44,6 +44,8 @@ jobs:
           python tools/ci/fetch_godot_macos.py --destination "$RUNNER_TEMP/godot"
           echo "GODOT=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
       - name: Build arm64 app and converter
+        run: python tools/ci/diagnose_macos.py --godot "$GODOT"
+      - name: Build arm64 app and converter package
         run: python tools/build_macos_arm64.py --godot "$GODOT"
       - name: Validate app, converter, and synthetic mods
         run: python tools/ci/validate_macos.py --gui
@@ -62,5 +64,7 @@ jobs:
           path: |
             private/macos-ci/*.json
             private/macos-ci/*.log
+            private/macos-ci/diagnostics/*.json
+            private/macos-ci/diagnostics/*.log
           if-no-files-found: warn
           retention-days: 14
