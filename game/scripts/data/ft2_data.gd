@@ -38,6 +38,8 @@ func load_table(table: String) -> Array:
 	if not _tables.has(key):
 		var parsed: Dictionary = read_json("data/port_ready/tables/" + key + ".dat.json")
 		_tables[key] = _decode_table(key, raw_table(key), parsed.get("records", []))
+		if FT2Content.active.extensions!=null:
+			for index in _tables[key].size():_tables[key][index]=FT2Content.active.extensions.display_record(key,index,_tables[key][index])
 	return _tables[key]
 
 func raw_table(table: String) -> PackedByteArray:
@@ -97,6 +99,9 @@ func _decode_table(table: String, raw: PackedByteArray, base: Array) -> Array:
 	return result
 
 func load_map(map_id: int) -> Dictionary:
+	if FT2Content.active.extensions!=null:
+		var definition: Dictionary=FT2Content.active.extensions.map_by_id(map_id)
+		if not definition.is_empty():return preload("res://scripts/extensions/ft2_extension_maps.gd").normalized(self,definition,map_id)
 	var index: Dictionary = read_json("data/port_ready/maps/index.json")
 	for row in index.maps:
 		if int(row.map_id) == map_id:
@@ -106,8 +111,22 @@ func load_map(map_id: int) -> Dictionary:
 
 func load_apd(stem: String) -> Dictionary:
 	var key := stem.get_file().get_basename().to_upper()
+	if FT2Content.active.extensions!=null:key=FT2Content.active.extensions.sprite_alias(key)
 	var parsed = read_json("data/port_ready/assets/apd/animations/" + key + ".json")
 	return parsed if parsed is Dictionary else {}
+
+func appearance_definition(definition: int) -> int:
+	return FT2Content.active.extensions.appearance_definition(definition) if FT2Content.active.extensions!=null else definition
+
+func sprite_stem(definition: int, variant: String) -> String:
+	var stem:="CHAR_%02d%s"%[definition,variant]
+	return FT2Content.active.extensions.sprite_alias(stem) if FT2Content.active.extensions!=null else stem
+
+func skill_visual_id(action: int) -> int:
+	return FT2Content.active.extensions.visual_skill(action) if FT2Content.active.extensions!=null else action
+
+func skill_numeric_id(action: int) -> int:
+	return FT2Content.active.extensions.numeric_skill(action) if FT2Content.active.extensions!=null else action
 
 func load_save(index: int) -> Dictionary:
 	var user_path := FT2Content.save_root().path_join("save%02d.dat" % index)
@@ -295,6 +314,11 @@ func decode_unit(bytes: PackedByteArray, slot: int = -1) -> Dictionary:
 		out[S32_FIELDS[offset]] = bytes.decode_s32(offset)
 	for offset in U32_FIELDS:
 		out[U32_FIELDS[offset]] = bytes.decode_u32(offset)
+	if FT2Content.active.extensions!=null:
+		var custom: Dictionary=FT2Content.active.extensions.character_by_race(int(out.definition_id))
+		if not custom.is_empty():
+			out["extension_id"]=custom.global_id
+			if str(custom.get("name",""))!="":out["extension_name"]=str(custom.name)
 	return out
 
 func encode_unit(unit: Dictionary) -> PackedByteArray:

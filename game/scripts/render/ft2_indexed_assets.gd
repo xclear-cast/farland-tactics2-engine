@@ -47,6 +47,7 @@ func image(key: String, remaps: Array = []) -> Dictionary:
 
 func apd(stem: String) -> Dictionary:
 	stem = stem.get_file().get_basename().to_upper()
+	if FT2Content.active!=null and FT2Content.active.extensions!=null:stem=FT2Content.active.extensions.sprite_alias(stem)
 	if not _apds.has(stem):
 		var path = str(manifest.get("apds", {}).get(stem, ""))
 		_apds[stem] = read_json(path) if path != "" else {}
@@ -66,6 +67,9 @@ static func apd_palette_band(key: String, first: int, count: int) -> Vector2i:
 	return Vector2i(208,16) if is_apd_z_sheet(key) else Vector2i(first,count)
 
 func map_data(id: int) -> Dictionary:
+	if FT2Content.active!=null and FT2Content.active.extensions!=null:
+		var definition: Dictionary=FT2Content.active.extensions.map_by_id(id)
+		if not definition.is_empty():return preload("res://scripts/extensions/ft2_extension_maps.gd").indexed(FT2Data.new(),definition,id)
 	if not _maps.has(id):
 		_maps[id] = read_json(str(manifest.get("maps", {}).get(str(id), "")))
 	return _maps[id]

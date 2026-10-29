@@ -182,7 +182,7 @@ func set_map(id: int) -> void:
 	for c in map.cells:
 		_cells[Vector2i(int(c[0]),int(c[1]))] = c
 	if map.has("baked"):
-		_baked = {"width":int(map.baked.width),"height":int(map.baked.height),"pixels":FT2Content.bytes(str(map.baked.indices))}
+		_baked = {"width":int(map.baked.width),"height":int(map.baked.height),"pixels":map.baked.pixels if map.baked.has("pixels") else FT2Content.bytes(str(map.baked.indices))}
 	for key in map.atlases:
 		var image = assets.image(str(key),[[10,112,32]])
 		if not image.is_empty():
@@ -366,7 +366,7 @@ func _refresh_actors() -> void:
 				if ability_offset+2 <= items.size() and items.decode_u16(ability_offset) == 11:
 					state = 11
 		var mirror = 16 if direction == 1 or direction == 2 else 0
-		if definition == 23 or definition == 73:
+		if data.appearance_definition(definition) in [23,73]:
 			mirror = 0
 		var prefix = "F." if direction <= 1 else "B."
 		var label = "STAND"
@@ -376,7 +376,7 @@ func _refresh_actors() -> void:
 		if inactive:
 			state = 9 if state == 9 else 0
 		if state in [0,6,7]:
-			if inactive and control != 7 and definition != 23 and definition != 73:
+			if inactive and control != 7 and not data.appearance_definition(definition) in [23,73]:
 				label = "SET"
 			elif int(u.move_marker) != 0 and int(u.action_marker) != 0 and control != 7:
 				label = "COMPLETE" if control == 0 else "STAND"
@@ -390,7 +390,7 @@ func _refresh_actors() -> void:
 			flags = mirror | 3 if animate else mirror | 128
 		else:
 			label = "DEAD" if state == 1 and control == 0 else "S/DAMAGE" if state == 4 else "A/DAMAGE" if state == 5 else "DOWN_DAMAGE"
-		var letter = "V" if game_mode == 4 and int(u.kind) != 8 and int(u.kind) < 30 and definition not in [23,72,73] else "A"
+		var letter = "V" if game_mode == 4 and int(u.kind) != 8 and int(u.kind) < 30 and data.appearance_definition(definition) not in [23,72,73] else "A"
 		var stem = "CHAR_%02d%s" % [definition,letter]
 		#419117/11A: a loaded definition resource wins over the requested letter.
 		# Entering an EVENT does not turn an existing A cache into a V resource.
@@ -480,7 +480,7 @@ func unit_preview(slot: int, pos: Vector2i, fresh_front: bool = false) -> Dictio
 			for equipment in [unit.weapon,unit.armor,unit.accessory1,unit.accessory2]:
 				if battle.rules.items.decode_u16(int(equipment)*56+52)==11:state=11
 		if state in [0,6,7]:
-			label = "SET" if inactive and int(unit.control)!=7 and int(unit.definition_id) not in [23,73] else ("COMPLETE" if int(unit.move_marker)!=0 and int(unit.action_marker)!=0 and int(unit.control)==0 else "STAND")
+			label = "SET" if inactive and int(unit.control)!=7 and data.appearance_definition(int(unit.definition_id)) not in [23,73] else ("COMPLETE" if int(unit.move_marker)!=0 and int(unit.action_marker)!=0 and int(unit.control)==0 else "STAND")
 		elif state==9:label="HIDE" if int(unit.control)==7 else ""
 		elif state==11:label="LEVITATE"
 		else:label="DEAD" if state==1 and int(unit.control)==0 else ("S/DAMAGE" if state==4 else ("A/DAMAGE" if state==5 else "DOWN_DAMAGE"))
@@ -1001,7 +1001,7 @@ func _physical_cleanup_record(record: Dictionary) -> void:
 			var label = original.label
 			if label.begins_with("F.") or label.begins_with("B."): label = label.substr(2)
 			var direction = int(unit.direction)
-			var flags = 1|(16 if direction in [1,2] and int(unit.definition_id) not in [23,73] else 0)
+			var flags = 1|(16 if direction in [1,2] and data.appearance_definition(int(unit.definition_id)) not in [23,73] else 0)
 			original.play(original.apd,("F." if direction <= 1 else "B.")+label,clock_ms,flags)
 			original.activate(128)
 		original.visible = true
@@ -1021,7 +1021,7 @@ func _magic_finished() -> void:
 		_refresh_actors()
 		_magic_replaced_caster = false
 	for slot in _actors:
-		if int(_unit(int(slot)).definition_id) in [23,73]: _actors[slot].player.visible = true
+		if data.appearance_definition(int(_unit(int(slot)).definition_id)) in [23,73]: _actors[slot].player.visible = true
 	_dirty = true
 	visual_finished.emit()
 
@@ -1034,7 +1034,7 @@ func _magic_target_pose(slot: int) -> void:
 		if _actors.has(slot):_actors[slot].player.activate(1)
 		return
 	var direction = int(u.direction)
-	var mirror = 16 if direction in [1,2] and int(u.definition_id) not in [23,73] else 0
+	var mirror = 16 if direction in [1,2] and data.appearance_definition(int(u.definition_id)) not in [23,73] else 0
 	_actors[slot].player.play(assets.apd(str(_actors[slot].stem)),("F." if direction <= 1 else "B.")+"MIDDLE_DAMAGE",clock_ms,mirror)
 
 func _refresh_actor(slot: int) -> void:
@@ -1043,7 +1043,7 @@ func _refresh_actor(slot: int) -> void:
 	if not unit.is_empty() and int(unit.definition_id) == 7: return
 	if not unit.is_empty():
 		var definition = int(unit.definition_id)
-		var letter = "V" if game_mode == 4 and int(unit.kind) != 8 and int(unit.kind) < 30 and definition not in [23,72,73] else "A"
+		var letter = "V" if game_mode == 4 and int(unit.kind) != 8 and int(unit.kind) < 30 and data.appearance_definition(definition) not in [23,72,73] else "A"
 		var requested = str(_actor_resource_stems.get(definition,"CHAR_%02d%s" % [definition,letter]))
 		if requested.ends_with("V") and not assets.manifest.get("apds",{}).has(requested) and assets.manifest.get("apds",{}).has("CHAR_%02dA" % definition):
 			actor_resource_load_failures[requested] = {"return_handle":0,"mode":game_mode,"definition":definition,"slot":slot,"existing_unit70_preserved":_actors.has(slot),"source":"419140..419157 early return before release","substitute_loaded":false}

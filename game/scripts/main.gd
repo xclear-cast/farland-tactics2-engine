@@ -16,6 +16,7 @@ const ExitRequest = preload("res://scripts/input/ft2_exit_request.gd")
 const DisplayProfile = preload("res://scripts/input/ft2_display_profile.gd")
 const LaunchOptions = preload("res://scripts/startup/ft2_launch_options_ui.gd")
 const LaunchModel = preload("res://scripts/startup/ft2_launch_options.gd")
+const ExtensionCampaign = preload("res://scripts/extensions/ft2_campaign_runner.gd")
 var data
 var battle
 var view
@@ -29,6 +30,7 @@ var startup
 var exit_request
 var launch_options
 var display_profile
+var campaign
 var source_display_adapter:Dictionary={"drive_type":3,"non8bit":0} # Portable fixed-disk / virtual indexed-display profile.
 var _display_restore_pending:=false
 var _launch_display_pending:=false
@@ -190,6 +192,12 @@ func _ready() -> void:
 	get_window().mouse_exited.connect(func(): _cursor_inside = false)
 	battle.phase_changed.connect(func(phase): _record_event({"frame":frame_number,"phase":phase}))
 	battle.unsupported_action.connect(func(details): errors.append({"frame":frame_number,"unsupported_action":details}))
+	campaign=ExtensionCampaign.new();add_child(campaign);campaign.configure(data,battle,vm,view,ui)
+	campaign.quit_requested.connect(_quit_game)
+	campaign.finished.connect(func(result):_record_event({"frame":frame_number,"kind":"extension_finished","result":result}))
+	# Keep one dispatcher so expansion combat never tries original EVENT-1 hooks.
+	if battle.hook_requested.is_connected(Callable(vm,"_on_hook")):battle.hook_requested.disconnect(Callable(vm,"_on_hook"))
+	battle.hook_requested.connect(_battle_hook_requested)
 	var initial := -1
 	var source_windowed := false
 	for arg in OS.get_cmdline_user_args():
@@ -214,6 +222,7 @@ func _ready() -> void:
 		battle.apply_settings(ui.settings)
 		view.apply_settings(ui.settings)
 	if initial >= 0: _load_save(initial, not bool(_automation.get("skip_restart_script",false)))
+	elif campaign.entry_story()!="":_new_game()
 	elif not _automation.is_empty() and not _automation.get("startup_menu",false) and not _automation.has("startup_profile"): _new_game()
 	elif not _automation.is_empty(): _begin_startup()
 	else: _open_launch_options()
@@ -247,6 +256,13 @@ func _set_map(map_id: int) -> void:
 	_record_event({"frame":frame_number,"map":map_id})
 
 func _load_save(index: int, restart_script: bool = true) -> void:
+	if campaign!=null and campaign.has_slot(index):
+		if campaign.load_slot(index):
+			ui.slot_header_provider=Callable(campaign,"slot_header")
+			_record_event({"frame":frame_number,"kind":"extension_load","index":index});return
+		errors.append({"extension_load_failed":index});return
+	if campaign!=null and campaign.active:
+		campaign.stop();ui.slot_header_provider=Callable()
 	battle.load_save(index)
 	var save: Dictionary = data.load_save(index)
 	vm.restore_state(save.header,save.tail,save.get("header_raw",PackedByteArray()))
@@ -263,13 +279,28 @@ func _load_save(index: int, restart_script: bool = true) -> void:
 	_record_event({"frame":frame_number,"kind":"load","index":index})
 
 func _save_game(index: int) -> void:
+	if campaign!=null and campaign.active:
+		var result: Error=campaign.save_slot(index)
+		_record_event({"frame":frame_number,"kind":"extension_save","index":index,"error":int(result)})
+		if result!=OK:errors.append({"extension_save":index,"error":int(result)})
+		return
 	var result: Error = data.save_game(index,battle,vm,audio.current_index)
 	_record_event({"frame":frame_number,"kind":"save","index":index,"error":int(result)})
 	if result != OK: errors.append({"save":index,"error":int(result)})
 
 func _new_game() -> void:
 	battle.substate = 0; battle.selected_slot = -1
+	if campaign!=null and campaign.entry_story()!="":
+		ui.slot_header_provider=Callable(campaign,"slot_header")
+		if not campaign.start():errors.append({"extension_start_failed":campaign.errors.duplicate()})
+		return
+	if campaign!=null and campaign.active:
+		campaign.stop();ui.slot_header_provider=Callable()
 	vm.bootstrap_campaign()
+
+func _battle_hook_requested(request: Dictionary) -> void:
+	if campaign!=null and campaign.active:campaign.on_battle_hook(request)
+	else:vm._on_hook(request)
 
 func _begin_startup() -> void:
 	var initial: Dictionary = startup.initial_state()
@@ -421,6 +452,7 @@ func _tick(delta_ms: int = 50) -> void:
 	frame_number += 1; elapsed_ms += delta_ms
 	view.advance_clock(delta_ms)
 	_run_steps()
+	if campaign!=null and campaign.active:campaign.advance(delta_ms)
 	if _autoplay != null:
 		for command in _autoplay.tick(battle,ui,vm,view): _record_event({"frame":frame_number,"kind":"autoplay","command":_plain(command)})
 	#408B30 tests EVENT==0 before the mode1 battle scheduler and opens41E6C0(-1).
@@ -505,6 +537,10 @@ func _input(event: InputEvent) -> void:
 			if event.keycode==KEY_SHIFT:_shift_held=event.pressed
 		exit_request.handle_input(event)
 		if exit_request.active:_present_close_request()
+		return
+	if campaign!=null and campaign.blocks_input():
+		if event is InputEventMouse:_pointer=Vector2i(event.position)
+		if campaign.handle_input(event) and event is InputEventKey:get_viewport().set_input_as_handled()
 		return
 	if ui.unit_window_blocks_primary_input(): return
 	if event is InputEventKey:
@@ -811,6 +847,10 @@ func _run_steps() -> void:
 			"load": _load_save(int(step.index),bool(step.get("restart",true)))
 			"save": _save_game(int(step.index))
 			"new_game": _new_game()
+			"extension_continue":
+				if campaign!=null:campaign.continue_dialogue()
+			"extension_choice":
+				if campaign!=null:campaign.choose(int(step.get("index",0)))
 			"click":
 				var motion := InputEventMouseMotion.new(); motion.position = Vector2(float(step.pos[0]),float(step.pos[1])); _input(motion)
 				var mouse := InputEventMouseButton.new(); mouse.position = Vector2(float(step.pos[0]),float(step.pos[1])); mouse.button_index = int(step.get("button",1)); mouse.pressed = true
@@ -859,6 +899,8 @@ func _finish_runtime(exit_code: int) -> void:
 	get_tree().call_deferred("quit",exit_code)
 
 func _release_runtime() -> void:
+	if campaign!=null:campaign.stop()
+	ui.slot_header_provider=Callable()
 	get_tree().auto_accept_quit=_original_auto_accept_quit
 	exit_request.dispose()
 	launch_options.dispose()
@@ -898,6 +940,7 @@ func _write_snapshot(name: String) -> void:
 		"round_index":battle.round_index,"money":battle.money,"rng":battle.rng,
 		"units":units,"vm":_plain(vm.snapshot_state()),
 		"input":{"camera":[view.camera.x,view.camera.y],"hover":[mouse_cell.x,mouse_cell.y],"facing_choice":facing_choice,"dragging":_dragging,"next_party_slot":_next_party_slot,"pause":_pause}}
+	if campaign!=null and campaign.active:snapshot["extension"]=campaign.snapshot_state()
 	var file := FileAccess.open(_output.path_join(name+".json"),FileAccess.WRITE)
 	file.store_string(JSON.stringify(snapshot,"\t"))
 
@@ -917,6 +960,9 @@ func _write_report() -> void:
 		"physical_fullscreen":physical_fullscreen_state(),
 		"window_close":{"requests":exit_request.requests,"active":exit_request.active},
 		"startup":startup.snapshot(),
+		"extension":campaign.snapshot_state() if campaign!=null and campaign.active else {},
+		"extension_trace":campaign.trace if campaign!=null else [],
+		"extension_errors":campaign.errors if campaign!=null else [],
 		"cursor":_plain(cursor_host.snapshot()),
 		"scope":"Actual Godot execution; this individual replay does not prove full campaign or pixel parity."},"\t"))
 

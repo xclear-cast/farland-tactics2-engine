@@ -178,9 +178,9 @@ func play(plan: Dictionary, units: Array, cells: Dictionary, now: int) -> bool:
 		return false
 	if _word(52) != 0:
 		var direction = int(unit.direction)
-		var mirror = 16 if direction in [1,2] and int(unit.definition_id) not in [23,73] else 0
+		var mirror = 16 if direction in [1,2] and data.appearance_definition(int(unit.definition_id)) not in [23,73] else 0
 		var prefix = "F." if direction <= 1 else "B."
-		var stem = "CHAR_%02dE" % int(unit.definition_id)
+		var stem = data.sprite_stem(int(unit.definition_id),"E")
 		if not _original_resource_available(stem): return _abort_missing_resource(previous_sound)
 		caster = {"player":_label_player(stem,prefix+str(_cast_labels[_id].prepare_label_unprefixed),mirror|1),"world":Vector2i(unit.x,unit.y),"slot":slot,"stem":stem,"prefix":prefix,"flags":mirror}
 		if caster.player.apd.is_empty():

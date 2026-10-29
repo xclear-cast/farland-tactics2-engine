@@ -1,12 +1,30 @@
 MIT License
 
-Copyright (c) 2026 FT2 example and documentation contributors
+Copyright (c) 2026 FT2 expansion, example and documentation contributors
 
-This licence applies to the contributors' newly authored text in
-docs/MODDING.md, docs/FORMATS.md and docs/ASSET_POLICY.md, and the newly authored
-example files in mods/example_balance/, mods/example_item_price/ and
-mods/example_settings/. It does not license the engine, original game content,
-third-party material, or user-provided files.
+This licence applies only to the contributors' newly authored material in these
+explicit paths:
+
+- game/scripts/editor/**
+- game/scripts/extensions/**
+- game/tests/test_extension_editor.gd
+- game/tests/test_extension_definitions.gd
+- game/tests/test_expansion_workflow.gd
+- docs/MODDING.md
+- docs/FORMATS.md
+- docs/ASSET_POLICY.md
+- docs/EXPANSION_EDITOR.md
+- docs/EXTENSION_RUNTIME_CONTRACT.md
+- mods/example_balance/**
+- mods/example_item_price/**
+- mods/example_settings/**
+- mods/example_expansion/**
+
+This scoped grant does not relicense other pre-existing engine files or their
+modifications, the separately GPL-licensed converter, original game content,
+third-party material, or user-provided files. The local original-resource
+references in the examples are identifiers, not a licence to the referenced art,
+audio, game logic or other content. Upstream notices remain applicable.
 
 Permission is hereby granted, free of charge, to any person obtaining a copy
 of this software and associated documentation files (the "Software"), to deal

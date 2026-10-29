@@ -10,6 +10,8 @@ var profile_id := ""
 var capabilities: Dictionary = {}
 var layers: Array[Dictionary] = []
 var issues: Array[String] = []
+var extensions
+const ExtensionRegistry = preload("res://scripts/extensions/ft2_extension_registry.gd")
 
 const STRIDES := {"item":56,"magic":64,"race":86}
 const REQUIRED := ["assets/indexed/manifest.json","assets/indexed/fonts.json","assets/indexed/font_masks.bin","assets/cp949.json","fixtures/item.dat","fixtures/magic.dat","fixtures/race.dat","data/port_ready/maps/index.json","data/port_ready/tables/stages.json","data/port_ready/scripts/spec/runtime_bindings.json"]
@@ -68,7 +70,7 @@ static func activate(cache_root: String, source_root: String, mods: Array = []) 
 	for mod_path in mods:
 		var mod_root := ProjectSettings.globalize_path(str(mod_path)).replace("\\","/").trim_suffix("/")
 		var mod = _plain_json(mod_root.path_join("mod.json"))
-		if not mod is Dictionary or mod.get("schema",0) != 1 or str(mod.get("id","")).is_empty():
+		if not mod is Dictionary or (mod.get("schema",0)!=1 and mod.get("schema",0)!=2) or str(mod.get("id","")).is_empty():
 			return {"ok":false,"error":"유효하지 않은 mod.json: "+mod_root}
 		if ids.has(str(mod.id)): return {"ok":false,"error":"중복 모드 ID: "+str(mod.id)}
 		ids[str(mod.id)] = true
@@ -80,6 +82,7 @@ static func activate(cache_root: String, source_root: String, mods: Array = []) 
 			if not STRIDES.has(str(edit.get("table",""))): return {"ok":false,"error":"지원하지 않는 테이블입니다."}
 		candidate.layers.append({"root":mod_root,"manifest":mod,"id":str(mod.id)})
 		identities.append([mod.id,FileAccess.get_sha256(mod_root.path_join("mod.json")),candidate._file_identities(mod_root.path_join("files"))])
+		if int(mod.schema)==2:identities.append(["extension-v2",str(mod.id),candidate._file_identities(mod_root)])
 	candidate.profile_id = JSON.stringify(identities).sha256_text().substr(0,24)
 	# Validate table edits before replacing the active mount.
 	var previous = active
@@ -87,6 +90,13 @@ static func activate(cache_root: String, source_root: String, mods: Array = []) 
 	for table in STRIDES: table_bytes(str(table))
 	for layer in candidate.layers:
 		for patch in layer.manifest.get("patches",[]): read_json(str(patch.target))
+	if candidate.issues.is_empty():
+		var base_races:=table_bytes("race")
+		var base_skills:=table_bytes("magic")
+		var manifest=read_json("assets/indexed/manifest.json")
+		candidate.extensions=ExtensionRegistry.new()
+		candidate.extensions.load_layers(candidate,base_races,base_skills,manifest if manifest is Dictionary else {})
+		candidate.issues.append_array(candidate.extensions.issues)
 	if not candidate.issues.is_empty():
 		active = previous
 		return {"ok":false,"error":"; ".join(candidate.issues)}
@@ -227,7 +237,7 @@ static func table_bytes(table: String) -> PackedByteArray:
 					if encoded.size() >= int(format[2]):
 						active.issues.append("테이블 문자열 길이 오류: "+str(field)); return PackedByteArray()
 					for i in range(int(format[2])): result[offset+i] = encoded[i] if i<encoded.size() else 0
-	return result
+	return active.extensions.append_table_rows(table,result) if active.extensions!=null else result
 
 func _encode(value: String, encoding: String) -> PackedByteArray:
 	var result := PackedByteArray()

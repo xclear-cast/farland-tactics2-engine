@@ -74,6 +74,7 @@ func _sound_cache() -> Array:
 	return cache
 
 func _resolve(stem: String, suffix: String, direction: int, definition: int = -1) -> Dictionary:
+	if data!=null and data.has_method("appearance_definition"):definition=data.appearance_definition(definition)
 	var requested = ("B." if direction in [2,3] else "F.")+suffix
 	var flags = 1|(16 if direction in [1,2] and not definition in [23,73] else 0)
 	var animations: Dictionary = _apd(stem).get("animations",{})

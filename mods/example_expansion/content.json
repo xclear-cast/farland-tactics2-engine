@@ -1,0 +1,127 @@
+{
+	"characters": [
+		{
+			"base_race": 1,
+			"id": "hero",
+			"level": 5,
+			"name": "새 주인공",
+			"skills": [
+				"spark"
+			],
+			"sprite": "CHAR_00E",
+			"stats": {
+				"atk.initial": 40,
+				"def.initial": 8,
+				"hp.initial": 50,
+				"mp.initial": 30
+			}
+		},
+		{
+			"base_race": 1,
+			"id": "enemy",
+			"level": 1,
+			"name": "연습 상대",
+			"skills": [],
+			"sprite": "CHAR_00E",
+			"stats": {
+				"atk.initial": 8,
+				"def.initial": 3,
+				"hp.initial": 18
+			}
+		}
+	],
+	"maps": [
+		{
+			"base_map": 40,
+			"cells": [],
+			"height": 8,
+			"id": "field",
+			"name": "나의 연습장",
+			"placements": [
+				{
+					"character": "hero",
+					"level": 5,
+					"side": "ally",
+					"x": 2,
+					"y": 2
+				},
+				{
+					"character": "enemy",
+					"level": 1,
+					"side": "enemy",
+					"x": 3,
+					"y": 2
+				}
+			],
+			"width": 8
+		}
+	],
+	"schema": 1,
+	"skills": [
+		{
+			"base_skill": 1,
+			"id": "spark",
+			"mp": 3,
+			"name": "나의 불꽃",
+			"power": 12,
+			"range_max": 3,
+			"range_min": 1,
+			"visual_skill": 1
+		}
+	],
+	"stories": [
+		{
+			"id": "intro",
+			"nodes": [
+				{
+					"id": "hello",
+					"next": "ready",
+					"speaker": "hero",
+					"text": "이곳에서 새로운 모험을 시작합니다.",
+					"type": "dialogue"
+				},
+				{
+					"id": "ready",
+					"next": "check",
+					"type": "set",
+					"value": 1,
+					"variable": "ready"
+				},
+				{
+					"else": "lost",
+					"equals": 1,
+					"id": "check",
+					"then": "fight",
+					"type": "branch",
+					"variable": "ready"
+				},
+				{
+					"id": "fight",
+					"map": "field",
+					"next": "won",
+					"on_defeat": "lost",
+					"type": "battle"
+				},
+				{
+					"id": "won",
+					"next": "ending",
+					"speaker": "hero",
+					"text": "첫 번째 연습을 마쳤습니다!",
+					"type": "dialogue"
+				},
+				{
+					"id": "lost",
+					"next": "ending",
+					"speaker": "hero",
+					"text": "다시 준비해서 도전해 봅시다.",
+					"type": "dialogue"
+				},
+				{
+					"id": "ending",
+					"type": "end"
+				}
+			],
+			"start": "hello"
+		}
+	]
+}

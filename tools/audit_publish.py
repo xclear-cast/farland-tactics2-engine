@@ -21,10 +21,12 @@ TOOL_FILES={'audit_publish.py','build_external.py','build_macos_arm64.py',
             'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py'}
 SOURCE_SUFFIXES={'.gd','.gdshader','.gdshaderinc','.uid'}
 DOC_FILES={'docs/usage-guide.gif','docs/usage-guide.mp4','docs/usage-guide-mac.gif','docs/usage-guide-mac.mp4','docs/usage-guide.md','docs/usage-guide.json',
-           'docs/MODDING.md','docs/FORMATS.md','docs/ASSET_POLICY.md'}
+           'docs/MODDING.md','docs/FORMATS.md','docs/ASSET_POLICY.md',
+           'docs/EXPANSION_EDITOR.md','docs/EXTENSION_RUNTIME_CONTRACT.md'}
 EXAMPLE_FILES={'mods/example_balance/mod.json','mods/example_item_price/mod.json','mods/example_item_price/README.md',
                'mods/example_settings/mod.json','mods/example_settings/README.md',
-               'mods/example_settings/files/custom/demo_settings.json'}
+               'mods/example_settings/files/custom/demo_settings.json',
+               'mods/example_expansion/mod.json','mods/example_expansion/content.json'}
 FORBIDDEN_PARTS={'private','dist','.git','.venv','.godot','__pycache__','node_modules'}
 DATA_SUFFIXES={'.dat','.bin','.idx','.pal','.bmp','.png','.jpg','.jpeg','.wav','.mid',
                '.sf2','.exe','.pck','.ttf','.ttc','.otf','.zip','.7z','.tar','.lzh',

@@ -436,6 +436,10 @@ func apply_settings(settings: Dictionary) -> void:
 	for key in presentation_settings:
 		if settings.has(key): presentation_settings[key] = bool(settings[key])
 
+func _extension_skill(action: int) -> Dictionary:
+	if FT2Content.active!=null and FT2Content.active.extensions!=null:return FT2Content.active.extensions.skill_by_action(action)
+	return {}
+
 func visual_bypassed(control: int) -> bool:
 	#41508F/415171 inspect actor+12 exactly, not friendliness/race/party slot.
 	return bool(presentation_settings.skip_ally) if control == 0 else bool(presentation_settings.skip_enemy)
@@ -470,7 +474,7 @@ func _commit_numeric() -> void:
 	if not path.is_empty(): units[selected_slot].encode_u32(92,1)
 	if not records.is_empty(): units[selected_slot].encode_u32(96,1)
 	var spawned: Array = []
-	if action_id == 82:
+	if int(_extension_skill(action_id).get("base_skill",action_id)) == 82:
 		var summon = rules.summon82(units,selected_slot,rng,navigation)
 		units = summon.units
 		rng = summon.seeds
@@ -481,6 +485,7 @@ func _commit_numeric() -> void:
 			unsupported_action.emit(last_error)
 			return
 	var effect = rules.items.decode_u16((action_id-1000)*56+48) if action_id >= 1000 else action_id
+	if action_id>0 and action_id<1000:effect=int(_extension_skill(action_id).get("visual_skill",effect))
 	pending_plan = {"actor_slot":selected_slot,"action_id":action_id,"effect_id":effect,"visual_kind":"physical" if action_id == 0 else "magic","origin":rollback_origin,"path":path.duplicate(),"direction":int(_preview.get("direction",actor.decode_u16(6))),"accepted_run":run,"prepared_before":prepared,"before_units":rules.copy_units(before),"after_units":snapshot_units(),"ordered_targets":_target_slots(records),"results":records,"center":_preview.get("center",point)}
 	pending_plan.spawned_slots = spawned
 	pending_plan.presentation_flags = presentation_settings.duplicate()

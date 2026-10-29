@@ -4,11 +4,18 @@
 **엔진 측 규격**입니다. 원작 EXE 디스어셈블리, 원본 테이블 덤프, 원작 대사·맵·이미지를
 담고 있지 않습니다. 일반적인 수치 모드는 아래 `table_edits`만으로 만들 수 있습니다.
 
-파랜드 2 확장팩 제작을 목표로 하지만, `schema: 1`은 현재 데이터 오버레이와 기존 레코드
-편집 규격입니다. 자작 확장 스토리, 새 캐릭터/스킬 ID 레지스트리, 선언형 스킬 실행기,
-맵 편집기까지 포함한 제작기 규격은
-아직 아닙니다. 앞으로의 제작 기능과 현재 지원 API는 [MODDING.md](MODDING.md)에서
-구분합니다. 현재 문서에 없는 namespace나 명령을 작동한다고 가정하지 마세요.
+`schema: 1`은 기존 데이터 오버레이와 레코드 편집 규격입니다. `schema: 2`는
+`content.json`에 새 캐릭터·스킬·격자 맵·스토리를 등록하는 현재 확장 규격입니다.
+정확한 v2 필드와 실행·저장 계약은 [EXTENSION_RUNTIME_CONTRACT.md](EXTENSION_RUNTIME_CONTRACT.md),
+화면에서 만드는 방법은 [EXPANSION_EDITOR.md](EXPANSION_EDITOR.md)를 참고하세요.
+
+```json
+{"schema": 2, "id": "my_pack", "name": "내 확장팩", "version": "1.0", "content": "content.json", "entry_story": "intro"}
+```
+
+아래는 v2에서도 유지하는 v1 파일/패치/수치 수정 규격입니다. 새 캐릭터와 스킬을 추가할
+때는 `table_edits`로 원작 ID를 덮지 말고 v2 정의를 사용합니다. 두 형식을 동시에 쓰는
+전문 프로젝트와 GUI에서 내보내는 정의 전용 프로젝트는 지원 범위가 다릅니다.
 
 ## `mod.json`: schema 1
 

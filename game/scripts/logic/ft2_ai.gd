@@ -12,7 +12,11 @@ func _init(navigation = null, rule_set = null) -> void:
 
 static func word(value: int) -> int: return ((value+32768)&65535)-32768
 
+func _template(skill: int) -> int:
+	return FT2Content.active.extensions.numeric_skill(skill) if FT2Content.active!=null and FT2Content.active.extensions!=null else skill
+
 func utility(actor_slot: int, skill: int, mode: int, side: int, center: Vector2i, minimum: int, maximum: int) -> int:
+	skill=_template(skill)
 	var a: PackedByteArray = nav.units[actor_slot]
 	var score = 0
 	for slot in nav.iterator(center,minimum,maximum):
@@ -116,15 +120,16 @@ func decision(actor_slot: int) -> Dictionary:
 						r[4] = index+1
 			for skill_slot in range(10):
 				var skill = a.decode_u16(56+2*skill_slot)
+				var template:=_template(skill)
 				if skill == 0 or a.decode_s32(96) != 0 or a.decode_u16(16) in [1,3,4,5,6,8,9]: continue
 				var off = skill*64
 				var shape = rules.magics.decode_u16(off+50)
 				var side = rules.magics.decode_u16(off+48)
 				var low = rules.magics.decode_u16(off+30)
 				var high = rules.magics.decode_u16(off+32)
-				if absi(rules.magics.decode_s16(off+22)) > a.decode_s16(42) or skill == 31 or shape > 4: continue
+				if absi(rules.magics.decode_s16(off+22)) > a.decode_s16(42) or template == 31 or shape > 4: continue
 				if shape == 2:
-					if skill == 62: continue
+					if template == 62: continue
 					var buckets = [0,0,0,0,0]
 					var targets: Dictionary = {}
 					for slot in nav.iterator(point,low,high):
@@ -135,7 +140,7 @@ func decision(actor_slot: int) -> Dictionary:
 						if point.x != bxy.x and point.y != bxy.y: continue
 						var direction = nav.facing(point,bxy)
 						if enemy:
-							if skill == 77:
+							if template == 77:
 								var p = point
 								var valid = true
 								for ignored in range(nav.manhattan(point,bxy)):
@@ -146,7 +151,7 @@ func decision(actor_slot: int) -> Dictionary:
 									p = next
 								if not valid: continue
 							buckets[direction] += 40 if mode == 6 else 20
-							if b.decode_u16(16) == {72:5,73:2,74:8,75:4}.get(skill,-1): buckets[direction] -= 20
+							if b.decode_u16(16) == {72:5,73:2,74:8,75:4}.get(template,-1): buckets[direction] -= 20
 						else: buckets[direction] -= 40
 						targets[direction] = bxy
 					var best = 4

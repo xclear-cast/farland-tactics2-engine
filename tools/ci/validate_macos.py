@@ -12,6 +12,7 @@ import tempfile
 ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tools'))
 from run_tests import fixtures
+from prepare_extension_fixtures import prepare as extension_fixtures
 
 
 def main():
@@ -63,6 +64,18 @@ def main():
     report=json.loads((synthetic/'godot_result.json').read_text(encoding='utf-8'))
     if not report['passed']:raise RuntimeError('Synthetic data/mod integration did not pass')
     run('setup-audio-contracts',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_setup_audio.gd'])
+    # These definitions and the editor's test project are entirely self-authored.
+    # Do not add a real installation path/cache or call the local-game validator.
+    extension_synthetic=extension_fixtures(output/'extension-synthetic')
+    run('extension-definitions',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_extension_definitions.gd','--',f'--fixtures={extension_synthetic}'])
+    extension_report=json.loads((extension_synthetic/'extension_result.json').read_text(encoding='utf-8'))
+    if not extension_report.get('passed')or not extension_report.get('synthetic_only'):
+        raise RuntimeError('Synthetic v2 definitions did not pass')
+    editor_output=output/'editor';editor_output.mkdir(parents=True,exist_ok=True)
+    run('extension-editor-controls',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_extension_editor.gd','--',f'--editor-output={editor_output}'])
+    editor_report=json.loads((editor_output/'result.json').read_text(encoding='utf-8'))
+    if not editor_report.get('passed')or editor_report.get('source_game_data_used')is not False:
+        raise RuntimeError('Content-free editor controls did not pass')
     run('no-original-data',[launcher,'--headless','--audio-driver','Dummy','--','--check-content',f'--engine-config={output/"absent-connection.json"}'],expected=2)
     if args.gui:
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
@@ -95,9 +108,11 @@ def main():
     result={'passed':True,'platform':platform.platform(),'architecture':platform.machine(),
             'signed_arm64_native_files':native_count,
             'strict_framework_bundles':len(frameworks),
-            'synthetic_engine_checks':report['checks'],'tests':records,'game_data_used':False,
+            'synthetic_engine_checks':report['checks'],
+            'synthetic_extension_checks':extension_report['checks'],'editor_control_checks':editor_report['checks'],
+            'tests':records,'game_data_used':False,
             'gui_first_setup_verified':args.gui,'real_gameplay_verified':False,
-            'scope':'Native arm64 build, app startup/setup, content-free package, synthetic loader/mod/parser/font/emulator validation. No original game or complete campaign validation.'}
+            'scope':'Native arm64 build, app startup/setup, content-free package, synthetic loader/v2 definitions/editor/parser/font/emulator validation. No original game or complete campaign validation.'}
     (output/'validation.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     build=json.loads((destination/'build_result.json').read_text(encoding='utf-8'))
     build.update(runtime_verified=True,validation_scope=result['scope'],real_gameplay_verified=False)

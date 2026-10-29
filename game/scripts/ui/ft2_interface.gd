@@ -807,6 +807,7 @@ func handle_unit_window_input(event:InputEvent,screen_point:Vector2i=Vector2i(-2
 	return _unit_window.input(event,screen_point)
 func _unit_name(slot: int) -> String:
 	var unit: Dictionary = data.decode_unit(battle.units[slot],slot)
+	if unit.has("extension_name"):return str(unit.extension_name)
 	if int(unit.kind) != 8 and int(unit.kind) < 30: return str(vm._speaker_names.get(int(unit.kind),""))
 	var race: Array = data.load_table("race")
 	return str(race[int(unit.definition_id)].get("name","")) if int(unit.definition_id) < race.size() else ""

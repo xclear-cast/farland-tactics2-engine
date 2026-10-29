@@ -1,0 +1,8 @@
+{
+	"content": "content.json",
+	"entry_story": "intro",
+	"id": "example_expansion",
+	"name": "첫 확장팩 예제",
+	"schema": 2,
+	"version": "1.0"
+}

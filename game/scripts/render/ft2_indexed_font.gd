@@ -9,6 +9,8 @@ var _cache: Dictionary = {}
 var _cache_order: Array[String] = []
 var _cache_sizes: Dictionary = {}
 var _cache_bytes = 0
+var _extension_fonts: Array[Font] = []
+var _extension_fonts_ready := false
 const CACHE_LIMIT_BYTES = 8*1024*1024
 
 func _remember(key: String, bitmap: Dictionary) -> void:
@@ -54,6 +56,61 @@ func _style(font: Dictionary) -> Dictionary:
 		return {}
 	return styles[key]
 
+func _extensions_active() -> bool:
+	if FT2Content.active==null or FT2Content.active.extensions==null:return false
+	var registry=FT2Content.active.extensions
+	return not registry.characters.is_empty() or not registry.skills.is_empty() or not registry.stories.is_empty()
+
+func _prepare_extension_fonts() -> void:
+	if _extension_fonts_ready:return
+	_extension_fonts_ready=true
+	# The original, verified private font is preferred. No font pixels are shipped.
+	var root:=FT2Content.active.root
+	var metadata=JSON.parse_string(FileAccess.get_file_as_string(root.path_join("conversion_report.json"))) if FileAccess.file_exists(root.path_join("conversion_report.json")) else null
+	var base=JSON.parse_string(FileAccess.get_file_as_string(root.path_join("assets/indexed/fonts.json")))
+	var path:=str(metadata.get("reports",{}).get("fonts",{}).get("font_file","")) if metadata is Dictionary else ""
+	if OS.get_name()=="Linux" and path.length()>2 and path.substr(1,1)==":":path="/mnt/"+path.left(1).to_lower()+path.substr(2).replace("\\","/")
+	if path!="" and FileAccess.file_exists(path) and base is Dictionary and FileAccess.get_sha256(path)==str(base.get("font_sha256","")):
+		var file:=FontFile.new();file.data=FileAccess.get_file_as_bytes(path)
+		_extension_fonts.append(file)
+	var system:=SystemFont.new()
+	system.font_names=PackedStringArray(["Malgun Gothic","Apple SD Gothic Neo","Noto Sans CJK KR","Noto Sans","Arial"])
+	system.allow_system_fallback=true
+	_extension_fonts.append(system)
+
+func _supplement(style: Dictionary, font: Dictionary, code: int) -> bool:
+	var key:=str(code)
+	if style.glyphs.has(key):return true
+	if not _extensions_active():return false
+	_prepare_extension_fonts()
+	var height:=int(font.get("height",16))
+	var size:=maxi(1,roundi(absi(height)*0.82)) if height>0 else maxi(1,absi(height))
+	var server:=TextServerManager.get_primary_interface()
+	for face in _extension_fonts:
+		for rid in face.get_rids():
+			if not server.font_has_char(rid,code):continue
+			server.font_set_oversampling(rid,1.0)
+			var glyph:=server.font_get_glyph_index(rid,size,code,0)
+			server.font_render_glyph(rid,Vector2i(size,0),glyph)
+			var texture_index:=server.font_get_glyph_texture_idx(rid,Vector2i(size,0),glyph)
+			var advance:=maxi(0,roundi(server.font_get_glyph_advance(rid,size,glyph).x))
+			if texture_index<0:
+				if code in [32,12288]:style.glyphs[key]={"offset":masks.size(),"rect":[0,0,0,0],"advance":[advance,int(style.metrics.height)],"pen":advance};return true
+				continue
+			var image:=server.font_get_texture_image(rid,Vector2i(size,0),texture_index)
+			if image==null:continue
+			var uv: Rect2=server.font_get_glyph_uv_rect(rid,Vector2i(size,0),glyph)
+			var offset: Vector2=server.font_get_glyph_offset(rid,Vector2i(size,0),glyph)
+			var width:=roundi(uv.size.x);var rows:=roundi(uv.size.y);var start:=masks.size()
+			for y in rows:
+				for x in width:
+					var pixel:=image.get_pixel(roundi(uv.position.x)+x,roundi(uv.position.y)+y)
+					var alpha: float=pixel.r if image.get_format() in [Image.FORMAT_L8,Image.FORMAT_R8] else pixel.a
+					masks.append(1 if alpha>=0.25 else 0)
+			style.glyphs[key]={"offset":start,"rect":[roundi(offset.x),int(style.metrics.ascent)+roundi(offset.y),width,rows],"advance":[advance,int(style.metrics.height)],"pen":advance,"extension_system_font":true}
+			return true
+	return false
+
 func measure(raw_text: String, font: Dictionary) -> Dictionary:
 	var style = _style(font)
 	if style.is_empty():
@@ -69,6 +126,7 @@ func measure(raw_text: String, font: Dictionary) -> Dictionary:
 	else:
 		for i in range(raw_text.length()):
 			var cp = str(raw_text.unicode_at(i))
+			if not style.glyphs.has(cp):_supplement(style,font,raw_text.unicode_at(i))
 			if style.glyphs.has(cp):
 				width += int(style.glyphs[cp].pen)
 			elif observations.has(_key(font) + "|" + raw_text.substr(i, 1)):

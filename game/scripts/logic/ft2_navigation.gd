@@ -145,6 +145,14 @@ func selectable(point: Vector2i, mask: Dictionary = {}) -> bool:
 	return grid.get(offset,0) > 0 and (other < 0 or other == actor_slot or units[other].decode_u16(18) == 7 or units[other].decode_u16(0) == 8)
 
 func selection_mask(slot: int,action: int) -> Dictionary:
+	if FT2Content.active!=null and FT2Content.active.extensions!=null:
+		var extension: Dictionary=FT2Content.active.extensions.skill_by_action(action)
+		if not extension.is_empty():
+			var original: PackedByteArray=rules.magics
+			rules.magics=FT2Content.active.extensions.numeric_table(action,original)
+			var result:=selection_mask(slot,int(extension.base_skill))
+			rules.magics=original
+			return result
 	var out: Dictionary = {}
 	var u: PackedByteArray = units[slot]
 	var start = rules.xy(u)
@@ -190,6 +198,14 @@ func selection_mask(slot: int,action: int) -> Dictionary:
 	return out
 
 func collect_targets(slot: int,clicked: Vector2i,action: int) -> Dictionary:
+	if FT2Content.active!=null and FT2Content.active.extensions!=null:
+		var extension: Dictionary=FT2Content.active.extensions.skill_by_action(action)
+		if not extension.is_empty():
+			var original: PackedByteArray=rules.magics
+			rules.magics=FT2Content.active.extensions.numeric_table(action,original)
+			var result:=collect_targets(slot,clicked,int(extension.base_skill))
+			rules.magics=original
+			return result
 	var u: PackedByteArray = units[slot]
 	var start = rules.xy(u)
 	var direction = u.decode_u16(6) if clicked == start else facing(start,clicked)

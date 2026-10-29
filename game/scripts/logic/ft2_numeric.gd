@@ -113,6 +113,14 @@ func deal_damage(action: int, height_delta: int) -> void:
 	if t.decode_s16(0x26) == 0: put16(t, 0x10, 1)
 
 func apply_numeric(actor: PackedByteArray, target: PackedByteArray, action: int, input_seeds: Array, target_slot: int = 17, same_unit: bool = false, first_result: int = 0, map_mode: int = 0, height_delta: int = 0, origin: Array = [], initial_critical: int = 0) -> Dictionary:
+	if FT2Content.active!=null and FT2Content.active.extensions!=null:
+		var extension: Dictionary=FT2Content.active.extensions.skill_by_action(action)
+		if not extension.is_empty():
+			var original: PackedByteArray=magics
+			magics=FT2Content.active.extensions.numeric_table(action,original)
+			var result:=apply_numeric(actor,target,int(extension.base_skill),input_seeds,target_slot,same_unit,first_result,map_mode,height_delta,origin,initial_critical)
+			magics=original
+			return result
 	a = actor.duplicate()
 	t = a if same_unit else target.duplicate()
 	attack_origin = Vector2i(a.decode_s32(8), a.decode_s32(12)) if origin.is_empty() else Vector2i(int(origin[0]), int(origin[1]))

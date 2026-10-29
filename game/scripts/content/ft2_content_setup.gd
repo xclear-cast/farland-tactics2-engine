@@ -14,6 +14,9 @@ var connect_button: Button
 var import_button: Button
 var worker: Thread
 var local_defaults: Dictionary = {}
+var _editor
+var _editor_window_size := Vector2i.ZERO
+var _editor_scale_size := Vector2i.ZERO
 
 func _ready() -> void:
 	Engine.max_fps = 60
@@ -89,6 +92,7 @@ func _build_ui() -> void:
 	var actions := HBoxContainer.new(); box.add_child(actions)
 	import_button = Button.new(); import_button.text = "게임 준비하기"; import_button.pressed.connect(_import); actions.add_child(import_button)
 	connect_button = Button.new(); connect_button.text = "연결하고 실행"; connect_button.pressed.connect(_connect_game); actions.add_child(connect_button)
+	var create := Button.new(); create.text = "확장팩 만들기"; create.pressed.connect(_open_editor); actions.add_child(create)
 	status_label = Label.new(); status_label.autowrap_mode = TextServer.AUTOWRAP_WORD_SMART; status_label.text = str(configuration.get("last_error","정품 데이터와 개인 캐시는 엔진 배포물에 포함되지 않습니다.")); box.add_child(status_label)
 
 func _browse(field: LineEdit, select_file: bool = false, filters: PackedStringArray = []) -> void:
@@ -122,6 +126,47 @@ func _connect_game() -> void:
 	if file == null: status_label.text = "연결 설정을 저장할 수 없습니다."; return
 	file.store_string(JSON.stringify(configuration,"\t")); file.close()
 	get_tree().change_scene_to_file("res://scenes/main.tscn")
+
+func _open_editor() -> void:
+	if is_instance_valid(_editor): return
+	_capture_fields()
+	var store = null
+	if not str(configuration.get("content_root","")).is_empty() and not str(configuration.get("source_root","")).is_empty():
+		var mounted := FT2Content.activate(str(configuration.content_root),str(configuration.source_root),[])
+		if mounted.ok: store = load("res://scripts/data/ft2_data.gd").new()
+	_editor = load("res://scripts/editor/ft2_expansion_editor.gd").new()
+	_editor.configure(store)
+	_editor.closed.connect(_close_editor)
+	_editor.play_requested.connect(_test_editor_project)
+	_editor_window_size = get_window().size
+	_editor_scale_size = get_window().content_scale_size
+	get_window().content_scale_size = Vector2i(1100,800)
+	get_window().size = Vector2i(1100,800)
+	hide();get_parent().add_child(_editor)
+
+func _close_editor() -> void:
+	if is_instance_valid(_editor): _editor.queue_free()
+	_editor = null
+	get_window().content_scale_size = _editor_scale_size
+	get_window().size = _editor_window_size
+	show()
+
+func _test_editor_project(folder: String) -> void:
+	var decoder := JSON.new()
+	if decoder.parse(FileAccess.get_file_as_string(folder.path_join("mod.json")))!=OK: return
+	var descriptor = decoder.data
+	var kept: Array[String] = []
+	for line in mods_field.text.split("\n",false):
+		var old_path := line.strip_edges().trim_prefix("\"").trim_suffix("\"")
+		if old_path.is_empty(): continue
+		var old := JSON.new()
+		if old.parse(FileAccess.get_file_as_string(old_path.path_join("mod.json")))==OK and old.data is Dictionary:
+			if str(old.data.get("id",""))==str(descriptor.get("id","")): continue
+		kept.append(old_path)
+	kept.append(folder)
+	mods_field.text="\n".join(kept)
+	_close_editor()
+	_connect_game()
 
 func _import() -> void:
 	_capture_fields()

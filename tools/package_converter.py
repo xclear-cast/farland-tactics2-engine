@@ -11,7 +11,8 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
                root/'requirements.txt',root/'COPYING-converter',root/'CONVERTER_LICENSE.json',
                root/'LICENSING.md',root/'THIRD_PARTY_NOTICES.md',root/'EXAMPLES_LICENSE']
     sources += [root/'docs'/name for name in ('usage-guide.gif','usage-guide.mp4','usage-guide-mac.gif','usage-guide-mac.mp4','usage-guide.md','usage-guide.json',
-                                             'MODDING.md','FORMATS.md','ASSET_POLICY.md')]
+                                             'MODDING.md','FORMATS.md','ASSET_POLICY.md',
+                                             'EXPANSION_EDITOR.md','EXTENSION_RUNTIME_CONTRACT.md')]
     for source in (root/'tools/converters').rglob('*'):
         if not source.is_file():continue
         relative = source.relative_to(root/'tools/converters')
@@ -49,6 +50,14 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
         identity=json.loads(stamp.read_text(encoding='utf-8'))
         if report.get('kind')!='standalone-converter-binary' or report.get('original_game_data_included')is not False or report.get('requires_python_installation')is not False or report.get('pipeline_sha256')!=identity.get('pipeline_sha256'):
             raise ValueError('Bundled converter identity/scope does not match its build record')
+        pipeline_files=[root/'tools/convert_installation.py',root/'tools/import_content.py',
+                        root/'tools/converters/font_charset.json',
+                        *sorted((root/'tools/converters').rglob('*.py'))]
+        pipeline_rows=[(path.relative_to(root/'tools').as_posix(),hashlib.sha256(path.read_bytes()).hexdigest())
+                       for path in pipeline_files if not path.name.startswith('test_')]
+        current=hashlib.sha256(json.dumps(pipeline_rows,sort_keys=True).encode()).hexdigest()
+        if identity.get('pipeline_sha256')!=current:
+            raise ValueError('Bundled converter is stale; rebuild it from the current converter sources')
     for path in tools.rglob('*'):
         if bundle.is_dir()and path.is_relative_to(bundle):continue
         if path.is_file() and path.relative_to(destination).as_posix() not in expected:
