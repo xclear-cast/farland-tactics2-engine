@@ -55,6 +55,7 @@ def files(directory: Path | None, suffix: str | None = None):
     if directory is None:return []
     result=[]
     for path in directory.rglob('*'):
+        if path.name=='.DS_Store' or path.name.startswith('._'):continue
         if path.is_symlink():raise ValueError(f'Symbolic links are unsupported: {path.name}')
         if path.is_file() and (suffix is None or path.suffix.casefold()==suffix.casefold()):result.append(path)
     return sorted(result,key=lambda p:p.relative_to(directory).as_posix().casefold())
@@ -123,10 +124,15 @@ def _convert_tables(source: Path, output: Path) -> dict:
 
 
 def _convert_saves(source: Path, output: Path) -> dict:
-    destination=output/'data/port_ready/saves';count=0
+    destination=output/'data/port_ready/saves';count=0;empty_slots=[]
     for path in files(find(source,'SAVE',required=False),'.dat'):
         if not re.fullmatch(r'SAVE\d+',path.stem,re.IGNORECASE):continue
         raw=path.read_bytes()
+        # The game's slot list treats a missing header or a zero header-size
+        # DWORD as unregistered. Empty slots have no game state to decode.
+        if len(raw)<4 or struct.unpack_from('<I',raw,0)[0]==0:
+            empty_slots.append(path.name)
+            continue
         if len(raw)!=6848:raise ValueError(f'Unsupported save length {len(raw)}: {path.name}')
         document=decode_bytes(raw)
         if encode_bytes(document)!=raw:raise ValueError(f'Save roundtrip failed: {path.name}')
@@ -134,7 +140,9 @@ def _convert_saves(source: Path, output: Path) -> dict:
     # The scenario converter must run before final map bindings can be resolved.
     dump(destination/'map_bindings.json',{'method':'Pending bounded EVENT Restart evaluation',
          'rows':[],'resolved_count':0,'pending_scenario_conversion':count>0})
-    return {'saves':count,'all_save_bytes_roundtrip':True,'map_bindings_pending':count>0}
+    return {'saves':count,'all_save_bytes_roundtrip':True,'map_bindings_pending':count>0,
+            'empty_saves_skipped':len(empty_slots),'empty_save_slots':empty_slots,
+            'save_roundtrip_scope':'Non-empty saves; empty slot files remain unchanged in the source installation.'}
 
 
 def _convert_text(source: Path, output: Path) -> dict:

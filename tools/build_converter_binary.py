@@ -123,9 +123,21 @@ if sys.argv[1:] == ['--self-test']:
         trace('stamp')
         catalog = Path(sys._MEIPASS) / 'converters' / 'font_charset.json'
         assert 215 in json.loads(catalog.read_text(encoding='utf-8'))['codepoints']
+        trace('empty-save-slots')
+        import tempfile
+        from converters.tables_audio import _convert_saves, finalize_save_bindings
+        with tempfile.TemporaryDirectory(prefix='ft2-empty-save-test-') as temporary:
+            test_root = Path(temporary)
+            save_dir = test_root / 'installation' / 'SAVE'
+            save_dir.mkdir(parents=True)
+            for slot in range(31): (save_dir / ('SAVE%02d.DAT' % slot)).write_bytes(b'')
+            result = _convert_saves(test_root / 'installation', test_root / 'cache')
+            assert result['saves'] == 0 and result['empty_saves_skipped'] == 31
+            assert not finalize_save_bindings(test_root / 'cache')['unresolved']
         print(json.dumps({'status':'self-test-passed', 'frozen':bool(getattr(sys,'frozen',False)),
                           'pipeline_sha256':stamp, 'cp949':True, 'pillow':version('pillow'),
-                          'unicorn':version('unicorn'), 'x86_result':43, 'font_catalog':True}))
+                          'unicorn':version('unicorn'), 'x86_result':43, 'font_catalog':True,
+                          'empty_save_slots_supported':31}))
     except Exception as error:
         print(json.dumps({'status':'self-test-failed','error':str(error)}))
         raise SystemExit(1)

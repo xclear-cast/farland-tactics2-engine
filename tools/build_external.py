@@ -33,11 +33,13 @@ def main():
     parser=argparse.ArgumentParser(description=__doc__)
     parser.add_argument('--godot',type=Path,default=Path(os.environ.get('FT2_GODOT',str(GODOT))))
     parser.add_argument('--windows-godot',type=Path,default=Path(os.environ['FT2_WINDOWS_GODOT'])if os.environ.get('FT2_WINDOWS_GODOT')else None)
+    parser.add_argument('--destination',type=Path,default=ROOT/'dist/FT2-External-Engine',
+                        help='Engine output directory; use a fresh directory while another build is running')
     options=parser.parse_args()
     GODOT=options.godot.resolve()
     if not GODOT.is_file():raise ValueError('Godot executable missing; pass --godot or FT2_GODOT')
     update_font_charset(ROOT)
-    destination = ROOT / 'dist/FT2-External-Engine'
+    destination = options.destination.resolve()
     destination.mkdir(parents=True, exist_ok=True)
     logs = ROOT / 'private/build'
     logs.mkdir(parents=True, exist_ok=True)

@@ -180,6 +180,7 @@ def main():
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
     run('graphics-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.test_graphics'])
     run('scenario-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.scenario_support.test_scenario'])
+    run('table-audio-save-parser-fixtures',[sys.executable,ROOT/'tools/converters/tables_audio_support/test_conversion.py'])
     run('distributed-converter-help',[sys.executable,'-I',resources/'tools/convert_installation.py','--help'])
     converter=app/'Contents/MacOS/tools/ft2-convert/ft2-convert'
     architecture=run('converter-architecture',['lipo','-archs',converter])
