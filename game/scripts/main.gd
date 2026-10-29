@@ -563,7 +563,7 @@ func _input(event: InputEvent) -> void:
 			_preview_mouse_facing(Vector2i(event.position))
 			if facing_choice != 4: battle.commit_facing(facing_choice)
 		else:
-			var accepted: bool = battle.select_cell(mouse_cell)
+			var accepted: bool = _select_tactical_cell(mouse_cell)
 			if battle.substate == 2:
 				facing_choice = 4
 				_preview_mouse_facing(Vector2i(event.position))
@@ -575,7 +575,7 @@ func _input(event: InputEvent) -> void:
 			KEY_ENTER,KEY_KP_ENTER,KEY_SPACE:
 				if battle.substate == 2:
 					if facing_choice != 4: battle.commit_facing(facing_choice)
-				elif mouse_cell.x != 0: battle.select_cell(mouse_cell)
+				elif mouse_cell.x != 0: _select_tactical_cell(mouse_cell)
 			KEY_UP,KEY_RIGHT,KEY_DOWN,KEY_LEFT:
 				if battle.substate == 2:
 					var directions := {KEY_UP:3,KEY_RIGHT:1,KEY_DOWN:0,KEY_LEFT:2}
@@ -583,6 +583,20 @@ func _input(event: InputEvent) -> void:
 				else:
 					var directions := {KEY_UP:Vector2i(0,-1),KEY_RIGHT:Vector2i(1,0),KEY_DOWN:Vector2i(0,1),KEY_LEFT:Vector2i(-1,0)}
 					_arrow_hover(directions[event.keycode])
+
+func _select_tactical_cell(point:Vector2i)->bool:
+	if battle.phase!="player":return false
+	if battle.substate==0:
+		#405899 checks cursor/pan before41A300 and opens41E920 for every
+		#non-party control except7. Mouse and cached-cell Enter share this path.
+		if _dragging or int(cursor_host.controller.resource_id)==105:return false
+		battle.navigation.units=battle.units
+		var slot:int=battle.navigation.occupant(point)
+		battle.selected_slot=slot
+		if slot>=0 and battle.units[slot].decode_u16(18) not in [0,7]:
+			ui.open_status(slot)
+			return true
+	return battle.select_cell(point)
 
 func _start_drag() -> void:
 	_dragging = true; _drag_last = _pointer; mouse_cell = Vector2i.ZERO

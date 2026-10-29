@@ -12,7 +12,7 @@ import re
 import subprocess
 
 ROOT=Path(__file__).resolve().parents[1]
-ROOT_FILES={'.gitignore','README.md','requirements.txt','build-requirements.txt','LICENSING.md','THIRD_PARTY_NOTICES.md','COPYING-converter','CONVERTER_LICENSE.json'}
+ROOT_FILES={'.gitignore','README.md','requirements.txt','build-requirements.txt','LICENSING.md','THIRD_PARTY_NOTICES.md','COPYING-converter','CONVERTER_LICENSE.json','EXAMPLES_LICENSE'}
 GAME_FILES={'game/project.godot','game/pack_external.gd','game/write_notices.gd',
             'game/native/ft2_synth.c','game/native/ft2_synth.gdextension',
             'game/native/include/gdextension_interface.h','game/native/include/tsf.h'}
@@ -20,6 +20,11 @@ TOOL_FILES={'audit_publish.py','build_external.py','build_macos_arm64.py',
             'convert_installation.py','import_content.py','package_converter.py',
             'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py'}
 SOURCE_SUFFIXES={'.gd','.gdshader','.gdshaderinc','.uid'}
+DOC_FILES={'docs/usage-guide.gif','docs/usage-guide.mp4','docs/usage-guide.md','docs/usage-guide.json',
+           'docs/MODDING.md','docs/FORMATS.md','docs/ASSET_POLICY.md'}
+EXAMPLE_FILES={'mods/example_balance/mod.json','mods/example_item_price/mod.json','mods/example_item_price/README.md',
+               'mods/example_settings/mod.json','mods/example_settings/README.md',
+               'mods/example_settings/files/custom/demo_settings.json'}
 FORBIDDEN_PARTS={'private','dist','.git','.venv','.godot','__pycache__','node_modules'}
 DATA_SUFFIXES={'.dat','.bin','.idx','.pal','.bmp','.png','.jpg','.jpeg','.wav','.mid',
                '.sf2','.exe','.pck','.ttf','.ttc','.otf','.zip','.7z','.tar','.lzh',
@@ -42,6 +47,7 @@ def private_paths():
 def allowed(relative):
     p=PurePosixPath(relative)
     if p.is_absolute()or any(part in ('','..',*FORBIDDEN_PARTS)for part in p.parts):return False
+    if relative in DOC_FILES or relative in EXAMPLE_FILES:return True
     if p.suffix.casefold()in DATA_SUFFIXES:return False
     if relative in ROOT_FILES or relative in GAME_FILES:return True
     if relative in {'game/pack_external.gd.uid','game/write_notices.gd.uid','game/native/ft2_synth.gdextension.uid'}:return True
@@ -52,9 +58,10 @@ def allowed(relative):
         return p.suffix=='.py' or p.name in {'README.md','requirements.txt','font_charset.json'}
     if p.parent==PurePosixPath('tools')and p.name in TOOL_FILES:return True
     if relative.startswith('tools/ci/')and p.suffix in {'.py','.sh'}:return True
+    if relative.startswith('tools/guide/')and p.suffix in {'.py','.gd'}:return True
     if relative=='tools/ci/macos_app_launcher.c':return True
     if relative.startswith('.github/workflows/')and p.suffix in {'.yml','.yaml'}:return True
-    return relative=='mods/example_balance/mod.json'
+    return False
 
 
 def sha(data):return hashlib.sha256(data).hexdigest()
@@ -63,6 +70,15 @@ def sha(data):return hashlib.sha256(data).hexdigest()
 def inspect(relative,data):
     errors=[]
     if not allowed(relative):return [{'path':relative,'kind':'outside_publication_allowlist'}]
+    if relative in {'docs/usage-guide.gif','docs/usage-guide.mp4'}:
+        document=json.loads((ROOT/'docs/usage-guide.json').read_text(encoding='utf-8'))
+        if not document.get('instructional_example')or document.get('original_game_data_used')is not False or document.get('original_game_screenshots_used')is not False or document.get('private_paths_displayed')is not False:
+            return [{'path':relative,'kind':'instructional_media_scope_not_verified'}]
+        row=next((row for row in document['files']if row['path']==relative),{})
+        if row.get('sha256')!=sha(data)or row.get('bytes')!=len(data):errors.append({'path':relative,'kind':'instructional_media_digest_mismatch'})
+        if relative.endswith('.gif')and(not data.startswith((b'GIF87a',b'GIF89a'))or len(data)>5_000_000):errors.append({'path':relative,'kind':'invalid_instructional_gif'})
+        if relative.endswith('.mp4')and(data[4:8]!=b'ftyp'or len(data)>10_000_000):errors.append({'path':relative,'kind':'invalid_instructional_video'})
+        return errors
     try:text=data.decode('utf-8')
     except UnicodeDecodeError:return [{'path':relative,'kind':'unexpected_binary'}]
     if b'\0'in data:errors.append({'path':relative,'kind':'unexpected_nul_byte'})
@@ -82,8 +98,9 @@ def inspect(relative,data):
 def source_paths():
     paths={ROOT/name for name in ROOT_FILES|GAME_FILES}
     paths.update(ROOT/'tools'/name for name in TOOL_FILES)
+    paths.update(ROOT/name for name in DOC_FILES|EXAMPLE_FILES)
     paths.update(ROOT/name for name in ('game/pack_external.gd.uid','game/write_notices.gd.uid','game/native/ft2_synth.gdextension.uid','mods/example_balance/mod.json'))
-    for directory in ('game/scripts','game/scenes','game/tests','tools/converters','tools/ci','.github/workflows'):
+    for directory in ('game/scripts','game/scenes','game/tests','tools/converters','tools/ci','tools/guide','.github/workflows'):
         base=ROOT/directory
         if base.is_dir():paths.update(base.rglob('*'))
     for path in sorted(paths):

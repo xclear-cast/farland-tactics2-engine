@@ -65,6 +65,8 @@ var _palette_prefix_ms = -1
 var _frame_override_active = false
 var _frame_override: Array = []
 var _magic_replaced_caster = false
+var _magic_deferred_plan:Dictionary={}
+var _magic_deferred_targets:Dictionary={}
 var _normal_draw_override = false
 var _result_backdrop: Image
 var _source_backdrop: Image #4499D0: keyed overlay in408580, opaque base in4374A4.
@@ -146,6 +148,21 @@ func _battle_changed() -> void:
 		return
 	if map_id != battle.map_id:
 		set_map(battle.map_id)
+	var pending:Dictionary=battle.pending_plan
+	if battle.phase=="visual" and str(pending.get("visual_kind","")) in ["magic","item"]:
+		if _magic_deferred_plan!=pending:
+			_magic_deferred_plan=pending;_magic_deferred_targets.clear()
+			var before:Array=pending.get("before_units",[])
+			for record in pending.get("results",[]):
+				var slot:=int(record.get("target_slot",-1))
+				if slot>=0 and slot<before.size() and slot!=int(pending.get("actor_slot",-1)) and _actors.has(slot):
+					var state:int=battle.units[slot].decode_u16(16)
+					if state in [4,5] and before[slot].decode_u16(16)!=state:
+						#4151D0 already resolved the result.4379C0 owns when the
+						#existing target sprite becomes stone/frozen, at impact.
+						_magic_deferred_targets[slot]=true
+	else:
+		_magic_deferred_plan={};_magic_deferred_targets.clear()
 	_refresh_actors()
 	_dirty = true
 
@@ -334,6 +351,8 @@ func _refresh_actors() -> void:
 	var races = data.load_table("race")
 	var items: PackedByteArray = data.raw_table("item")
 	for slot in range(battle.units.size()):
+		if _magic_deferred_targets.has(slot) and _actors.has(slot):
+			live[slot]=_actors[slot];continue
 		var u = _unit(slot)
 		var definition = int(u.definition_id)
 		if int(u.kind) == 0 or definition == 7 or definition >= races.size():
@@ -1011,13 +1030,15 @@ func _magic_target_pose(slot: int) -> void:
 		return
 	var u = _unit(slot)
 	if int(u.state) in [4,5]:
-		_actors[slot].player.activate(1)
+		_refresh_actor(slot) #437A3C rebuilds this target before437A4A activation.
+		if _actors.has(slot):_actors[slot].player.activate(1)
 		return
 	var direction = int(u.direction)
 	var mirror = 16 if direction in [1,2] and int(u.definition_id) not in [23,73] else 0
 	_actors[slot].player.play(assets.apd(str(_actors[slot].stem)),("F." if direction <= 1 else "B.")+"MIDDLE_DAMAGE",clock_ms,mirror)
 
 func _refresh_actor(slot: int) -> void:
+	_magic_deferred_targets.erase(slot) # Explicit native4196F0 service releases this target only.
 	var unit = _unit(slot)
 	if not unit.is_empty() and int(unit.definition_id) == 7: return
 	if not unit.is_empty():

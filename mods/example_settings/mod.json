@@ -1,0 +1,18 @@
+{
+  "schema": 1,
+  "id": "example_settings",
+  "name": "직접 만든 JSON 추가와 패치 연습",
+  "version": "1.0",
+  "table_edits": [],
+  "patches": [
+    {
+      "target": "custom/demo_settings.json",
+      "operations": [
+        {"op": "set", "path": "/difficulty", "value": "custom"},
+        {"op": "set", "path": "/show_hint", "value": true},
+        {"op": "append", "path": "/notes", "value": "이 문장은 자체 작성한 패치 예제입니다."},
+        {"op": "remove", "path": "/temporary"}
+      ]
+    }
+  ]
+}

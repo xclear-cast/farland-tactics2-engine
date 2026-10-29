@@ -25,6 +25,11 @@ treat that metadata as a BSD grant for the native core.
 
 ## Engine and original game: outside that grant
 
+The newly authored mod examples and SDK text identified in
+[EXAMPLES_LICENSE](EXAMPLES_LICENSE) are separately available under MIT so
+creators can copy and adapt those examples. This is not a licence for any
+original game material or a blanket grant over the engine.
+
 There is no blanket GPL/MIT grant for the engine or for the whole repository.
 The pre-existing engine's code-origin and redistribution review remains separate.
 Source publication must not be described as legal clearance or proof of strict

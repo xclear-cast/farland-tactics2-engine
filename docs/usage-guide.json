@@ -1,0 +1,36 @@
+{
+  "schema": 1,
+  "seconds": 28,
+  "resolution": [
+    960,
+    720
+  ],
+  "instructional_example": true,
+  "actual_setup_ui_used": true,
+  "original_game_data_used": false,
+  "original_game_screenshots_used": false,
+  "private_paths_displayed": false,
+  "font_binary_included": false,
+  "conversion_timing": "Shortened illustration; real initial preparation may take several minutes",
+  "chapters": [
+    "Unzip the whole package into a separate folder",
+    "Open the Windows or Mac start file",
+    "Choose the original game folder",
+    "Identify DATA/MAP/SPRITE/FTO_O.EXE in its parent folder",
+    "Click prepare and wait",
+    "Click connect and launch",
+    "Reopen setup when changing folders or mods"
+  ],
+  "files": [
+    {
+      "path": "docs/usage-guide.gif",
+      "bytes": 261973,
+      "sha256": "f3fcef730bcd617852d40e2dd47b9be5678b5a5161d59e55ff65594150576de1"
+    },
+    {
+      "path": "docs/usage-guide.mp4",
+      "bytes": 329361,
+      "sha256": "b9cb2ba7bbb5fe46f220cffab03b10edc49b8fd95ff3b822d1fa98d9de101190"
+    }
+  ]
+}

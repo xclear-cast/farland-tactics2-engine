@@ -1,0 +1,10 @@
+{
+  "schema": 1,
+  "id": "example_item_price",
+  "name": "기존 1번 아이템 가격 변경 예제",
+  "version": "1.0",
+  "table_edits": [
+    {"table": "item", "record": 1, "fields": {"price": 10}}
+  ],
+  "patches": []
+}
