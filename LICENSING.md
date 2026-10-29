@@ -25,9 +25,10 @@ treat that metadata as a BSD grant for the native core.
 
 ## Engine and original game: outside that grant
 
-The newly authored mod examples and SDK text identified in
+The newly authored expansion editor, expansion runtime helpers, MCP stdio bridge,
+mod examples and SDK text identified in
 [EXAMPLES_LICENSE](EXAMPLES_LICENSE) are separately available under MIT so
-creators can copy and adapt those examples. This is not a licence for any
+creators can copy and adapt those components. This is not a licence for any
 original game material or a blanket grant over the engine.
 
 There is no blanket GPL/MIT grant for the engine or for the whole repository.
@@ -77,3 +78,8 @@ source-delivery arrangement; an upstream URL alone is not the release policy
 used here. The binary/source packages must be retained together, and changed
 third-party code or build scripts must be reflected in the corresponding source.
 This source package is not a claim of overall legal clearance.
+
+The frozen tools also include the MIT-licensed `tools/editor_mcp.py` stdio
+component. Its source and MIT grant are included alongside the converter's
+corresponding source. Its original MIT terms are preserved; the combined frozen
+distribution still includes the separately GPL-licensed converter and Unicorn.

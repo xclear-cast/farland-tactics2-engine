@@ -41,7 +41,7 @@ func run() -> void:
 	if not font_path.is_empty():
 		var font:=FontFile.new();font.data=FileAccess.get_file_as_bytes(font_path);theme=Theme.new();theme.default_font=font;theme.default_font_size=16
 	var type=load("res://scripts/editor/ft2_expansion_editor.gd")
-	var editor=type.new();editor.theme=theme;root.add_child(editor);editor.configure(null)
+	var editor=type.new();editor.external_preview_enabled=false;editor.theme=theme;root.add_child(editor);editor.configure(null)
 	await process_frame
 	editor.buttons.new.pressed.emit()
 	editor.fields["project.id"].text="editor_test"
@@ -161,7 +161,7 @@ func run() -> void:
 	var setup:=SetupWithoutStartup.new();setup.theme=theme;root.add_child(setup);setup._build_ui()
 	setup._open_editor();await process_frame
 	check(is_instance_valid(setup._editor)and setup._editor.data==null,"setup opens authoring without original data")
-	check(root.size==Vector2i(1100,800),"setup enlarges the authoring window")
+	check(root.size==Vector2i(1280,840),"setup opens a desktop workbench window")
 	setup._editor.buttons.close.pressed.emit();await process_frame;await process_frame
 	check(setup._editor==null and setup.visible and root.size==before_size and root.content_scale_size==before_scale,"editor close restores setup and window geometry")
 	setup.queue_free();await process_frame

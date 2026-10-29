@@ -8,11 +8,13 @@ import json
 def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
     root, destination = Path(root).resolve(), Path(destination).resolve()
     sources = [root/'tools/convert_installation.py', root/'tools/import_content.py',
+               root/'tools/editor_mcp.py',
                root/'requirements.txt',root/'COPYING-converter',root/'CONVERTER_LICENSE.json',
                root/'LICENSING.md',root/'THIRD_PARTY_NOTICES.md',root/'EXAMPLES_LICENSE']
     sources += [root/'docs'/name for name in ('usage-guide.md',
                                              'MODDING.md','FORMATS.md','ASSET_POLICY.md',
-                                             'EXPANSION_EDITOR.md','EXTENSION_RUNTIME_CONTRACT.md')]
+                                             'EXPANSION_EDITOR.md','EXTENSION_RUNTIME_CONTRACT.md','EDITOR_DESIGN.md',
+                                             'EDITOR_MCP.md','EDITOR_MCP_CLIENTS.md')]
     for source in (root/'tools/converters').rglob('*'):
         if not source.is_file():continue
         relative = source.relative_to(root/'tools/converters')
@@ -66,6 +68,8 @@ def copy_converter_payload(root: Path, destination: Path) -> list[dict]:
         current=hashlib.sha256(json.dumps(pipeline_rows,sort_keys=True).encode()).hexdigest()
         if identity.get('pipeline_sha256')!=current:
             raise ValueError('Bundled converter is stale; rebuild it from the current converter sources')
+        if report.get('editor_mcp_included')is not True or identity.get('editor_mcp_source_sha256')!=hashlib.sha256((root/'tools/editor_mcp.py').read_bytes()).hexdigest():
+            raise ValueError('Bundled editor MCP server is missing or stale; rebuild the standalone tools')
     for path in tools.rglob('*'):
         if bundle.is_dir()and path.is_relative_to(bundle):continue
         if path.is_file() and path.relative_to(destination).as_posix() not in expected:

@@ -65,6 +65,7 @@ func run() -> void:
 	check(is_instance_valid(setup._editor),"setup opens the actual authoring editor")
 	if not is_instance_valid(setup._editor):write_report();quit(1);return
 	var editor=setup._editor
+	editor.external_preview_enabled=false
 	check(editor.data!=null,"editor receives the prepared original-data store")
 	editor.buttons.new.pressed.emit()
 	var pack_id: String="workflow_"+str(int(Time.get_unix_time_from_system()))+"_"+str(OS.get_process_id())

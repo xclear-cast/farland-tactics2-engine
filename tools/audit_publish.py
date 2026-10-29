@@ -18,11 +18,12 @@ GAME_FILES={'game/project.godot','game/pack_external.gd','game/write_notices.gd'
             'game/native/include/gdextension_interface.h','game/native/include/tsf.h'}
 TOOL_FILES={'audit_publish.py','build_external.py','build_macos_arm64.py',
             'convert_installation.py','import_content.py','package_converter.py',
-            'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py'}
+            'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py','editor_mcp.py'}
 SOURCE_SUFFIXES={'.gd','.gdshader','.gdshaderinc','.uid'}
 DOC_FILES={'docs/usage-guide.md',
            'docs/MODDING.md','docs/FORMATS.md','docs/ASSET_POLICY.md',
-           'docs/EXPANSION_EDITOR.md','docs/EXTENSION_RUNTIME_CONTRACT.md'}
+           'docs/EXPANSION_EDITOR.md','docs/EXTENSION_RUNTIME_CONTRACT.md','docs/EDITOR_DESIGN.md',
+           'docs/EDITOR_MCP.md','docs/EDITOR_MCP_CLIENTS.md'}
 EXAMPLE_FILES={'mods/example_balance/mod.json','mods/example_item_price/mod.json','mods/example_item_price/README.md',
                'mods/example_settings/mod.json','mods/example_settings/README.md',
                'mods/example_settings/files/custom/demo_settings.json',
@@ -60,6 +61,7 @@ def allowed(relative):
         return p.suffix=='.py' or p.name in {'README.md','requirements.txt','font_charset.json'}
     if p.parent==PurePosixPath('tools')and p.name in TOOL_FILES:return True
     if relative.startswith('tools/ci/')and p.suffix in {'.py','.sh'}:return True
+    if relative=='tools/tests/test_editor_mcp.py':return True
     if relative.startswith('tools/guide/')and p.suffix in {'.py','.gd'}:return True
     if relative=='tools/guide/folder_capture_manifest.example.json':return True
     if relative=='tools/ci/macos_app_launcher.c':return True
@@ -94,7 +96,7 @@ def source_paths():
     paths.update(ROOT/'tools'/name for name in TOOL_FILES)
     paths.update(ROOT/name for name in DOC_FILES|EXAMPLE_FILES)
     paths.update(ROOT/name for name in ('game/pack_external.gd.uid','game/write_notices.gd.uid','game/native/ft2_synth.gdextension.uid','mods/example_balance/mod.json'))
-    for directory in ('game/scripts','game/scenes','game/tests','tools/converters','tools/ci','tools/guide','.github/workflows'):
+    for directory in ('game/scripts','game/scenes','game/tests','tools/converters','tools/ci','tools/guide','tools/tests','.github/workflows'):
         base=ROOT/directory
         if base.is_dir():paths.update(base.rglob('*'))
     for path in sorted(paths):

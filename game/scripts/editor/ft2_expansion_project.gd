@@ -5,7 +5,14 @@ extends RefCounted
 var descriptor: Dictionary = {}
 var content: Dictionary = {}
 var folder := ""
-var source_data
+const Baseline=preload("res://scripts/editor/ft2_editor_baseline.gd")
+var _baseline=Baseline.new()
+var _source_data
+var source_data:
+	get:return _source_data
+	set(value):
+		_source_data=value
+		_baseline.configure(value)
 var issues: Array[String] = []
 
 const KINDS := ["characters","skills","maps","stories"]
@@ -13,6 +20,90 @@ const NODE_TYPES := ["dialogue","battle","branch","set","end"]
 const STAT_NAMES := ["hp","mp","atk","def","int","mdef","agi"]
 
 func _init() -> void: new_project()
+
+func baseline_status() -> Dictionary:return _baseline.status()
+func original_character(race_id: int) -> Dictionary:return _baseline.character(race_id)
+func original_skill(skill_id: int) -> Dictionary:return _baseline.skill(skill_id)
+func original_catalog(kind: String,search: String="") -> Array:return _baseline.catalog(kind,search)
+
+func character_defaults(record: Dictionary) -> Dictionary:
+	var defaults:=original_character(int(record.get("base_race",-1)))
+	if defaults.is_empty():return {}
+	defaults.id=record.get("id",defaults.id)
+	# Level is an instance setting, absent from the original RACE table.
+	defaults.level=record.get("level",1)
+	return defaults
+
+func skill_defaults(record: Dictionary) -> Dictionary:
+	var defaults:=original_skill(int(record.get("base_skill",-1)))
+	if defaults.is_empty():return {}
+	defaults.id=record.get("id",defaults.id)
+	return defaults
+
+func _baseline_kind(kind: String) -> String:
+	return "characters" if kind in ["character","characters","race"] else "skills" if kind in ["skill","skills","magic"] else ""
+
+func _baseline_record(kind: String,index: int) -> Dictionary:
+	if kind.is_empty()or index<0 or index>=content.get(kind,[]).size():return {}
+	return content[kind][index]
+
+func reset_record(kind: String,index: int) -> Dictionary:
+	kind=_baseline_kind(kind)
+	var record:=_baseline_record(kind,index)
+	if record.is_empty():return {"ok":false,"error":"초기화할 항목을 선택하세요."}
+	var defaults:=character_defaults(record)if kind=="characters"else skill_defaults(record)
+	if defaults.is_empty():return {"ok":false,"error":"정품 원본값이 없습니다. 먼저 게임을 연결하세요."}
+	# A sparse override inherits numeric values from the referenced original row.
+	if kind=="characters":defaults.stats={}
+	update_record(kind,index,defaults)
+	return {"ok":true,"record":defaults.duplicate(true)}
+
+func reset_field(kind: String,index: int,key: String) -> Dictionary:
+	kind=_baseline_kind(kind)
+	var record:=_baseline_record(kind,index)
+	if record.is_empty():return {"ok":false,"error":"초기화할 항목을 선택하세요."}
+	var defaults:=character_defaults(record)if kind=="characters"else skill_defaults(record)
+	if defaults.is_empty():return {"ok":false,"error":"정품 원본값이 없습니다. 먼저 게임을 연결하세요."}
+	if key in ["id","base_race","base_skill","level"]:return {"ok":false,"error":"ID·원본 참조·레벨은 원본값 초기화 대상이 아닙니다."}
+	var changed:=record.duplicate(true)
+	if kind=="characters"and (key.begins_with("stats.")or key.split(".").size()==2):
+		var stat:=key.trim_prefix("stats.")
+		if not defaults.stats.has(stat):return {"ok":false,"error":"원본 능력치 필드가 없습니다."}
+		var stats: Dictionary=changed.get("stats",{}).duplicate(true);stats.erase(stat);changed.stats=stats
+	elif defaults.has(key):changed[key]={}if key=="stats"else defaults[key].duplicate(true)if defaults[key]is Dictionary or defaults[key]is Array else defaults[key]
+	else:return {"ok":false,"error":"원본 필드가 없습니다: "+key}
+	update_record(kind,index,changed)
+	return {"ok":true,"record":changed.duplicate(true)}
+
+func changed_fields(kind: String,index: int) -> Array[String]:
+	kind=_baseline_kind(kind)
+	var record:=_baseline_record(kind,index)
+	var changed: Array[String]=[]
+	if record.is_empty():return changed
+	var defaults:=character_defaults(record)if kind=="characters"else skill_defaults(record)
+	if defaults.is_empty():return changed
+	for key in defaults:
+		if key in ["id","base_race","base_skill","level"]:continue
+		if key=="stats":
+			for stat in record.get("stats",{}):
+				if not _same_value(record.stats[stat],defaults.stats.get(stat)):changed.append("stats."+str(stat))
+		elif not _same_value(record.get(key,defaults[key]),defaults[key]):changed.append(str(key))
+	return changed
+
+func _same_value(left: Variant,right: Variant) -> bool:
+	# JSON parses numbers as floats; 1 and 1.0 still represent the same default.
+	if (left is int or left is float)and(right is int or right is float):return left==right
+	if left is Array and right is Array:
+		if left.size()!=right.size():return false
+		for index in left.size():
+			if not _same_value(left[index],right[index]):return false
+		return true
+	if left is Dictionary and right is Dictionary:
+		if left.size()!=right.size():return false
+		for key in left:
+			if not right.has(key)or not _same_value(left[key],right[key]):return false
+		return true
+	return left==right
 
 func new_project() -> void:
 	descriptor={"schema":2,"id":"my_expansion","name":"나의 첫 확장팩","version":"1.0","content":"content.json","entry_story":"intro"}
@@ -109,9 +200,8 @@ func _keys(record: Dictionary,allowed: Array,label: String) -> void:
 		if not str(key)in allowed:_issue(label+"지원하지 않는 필드: "+str(key))
 
 func _original_count(table: String) -> int:
-	if source_data!=null:
-		var document=source_data.read_json("data/port_ready/tables/"+table+".dat.json")
-		if document is Dictionary and document.get("records")is Array:return document.records.size()
+	var count:=int(_baseline.status().get("character_count"if table=="race"else"skill_count",0))
+	if count>0:return count
 	return 74 if table=="race" else 84
 
 func validate_project() -> Dictionary:
@@ -169,7 +259,9 @@ func validate_project() -> Dictionary:
 		if str(row.get("name","")).length()>128:_issue(label+"이름은 128자 이내로 입력하세요.")
 		if not _integer(row.get("mp",-1),0,32767):_issue(label+"MP 소비는 0~32767 정수입니다.")
 		if not _integer(row.get("power",0),-32768,32767):_issue(label+"위력은 -32768~32767 정수입니다.")
-		elif int(row.get("power",0))==0:_issue(label+"스킬 위력은 0일 수 없습니다.")
+		elif int(row.get("power",0))==0:
+			var original:=original_skill(int(row.get("base_skill",-1)))
+			if original.is_empty()or int(original.get("power",0))!=0:_issue(label+"공격 스킬 위력은 0일 수 없습니다.")
 		if int(row.get("range_min",0))<0 or int(row.get("range_max",0))<int(row.get("range_min",0)):_issue(label+"최대 거리는 최소 거리 이상이어야 합니다.")
 	for row in content.maps:
 		var label: String="맵 "+str(row.id)+": "

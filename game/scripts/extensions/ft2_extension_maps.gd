@@ -1,5 +1,7 @@
 class_name FT2ExtensionMaps
 extends RefCounted
+
+static var _floor_cache:Dictionary={}
 ## Build a new 1-based board from local original tile references, never files.
 
 static func _template_score(cell: Dictionary) -> int:
@@ -58,7 +60,8 @@ static func normalized(data, definition: Dictionary, numeric_id: int) -> Diction
 		"base_map":base_id,"width":width,"height":height,"world_lookup_side":side,"cell_count":cells.size(),
 		"background_bitmap_name":str(base.get("background_bitmap_name","")),"atlas_names":base.get("atlas_names",[]).duplicate(),
 		"header_0x20_eight_signed_dwords":header,"header_map_bounds_ltrb":bounds,"base_offset_xy":base_xy,
-		"world_lookup_y_major_1based_zero_invalid":lookup,"cells":cells,"static_layer_draw_cell_indices":order}
+		"world_lookup_y_major_1based_zero_invalid":lookup,"cells":cells,"static_layer_draw_cell_indices":order,
+		"floor_template":_background_floor(base,base_id)}
 
 static func indexed(data, definition: Dictionary, numeric_id: int) -> Dictionary:
 	var source := normalized(data,definition,numeric_id)
@@ -84,6 +87,8 @@ static func indexed(data, definition: Dictionary, numeric_id: int) -> Dictionary
 	for ordinal in result.static_order:
 		var cell: Array = cells[int(ordinal)]
 		var anchor := Vector2i((int(cell[0])-int(cell[1]))*32+int(result.base[0]),(int(cell[0])+int(cell[1]))*16+int(result.base[1])-int(cell[2])*8)
+		if not source.get("floor_template",{}).is_empty():
+			surface.blit(source.floor_template,Rect2i(0,0,64,32),anchor+Vector2i(-32,-16),0,0,0,Rect2i(0,0,width,height))
 		for part in cell[6]:
 			var index := int(part[0])
 			if index<0 or index>=atlases.size(): continue
@@ -100,3 +105,55 @@ static func indexed(data, definition: Dictionary, numeric_id: int) -> Dictionary
 			for edge in range(4):surface.line(corners[edge],corners[(edge+1)%4],254)
 	result.baked={"width":width,"height":height,"pixels":surface.pixels,"transparent":0}
 	return result
+
+static func _part_visible(part:Dictionary,atlases:Array,assets)->bool:
+	var index:=int(part.get("atlas_index",-1))
+	if index<0 or index>=atlases.size():return false
+	var image:Dictionary=assets.image("map/"+str(atlases[index]).to_lower(),[[10,112,32]])
+	if image.is_empty():return false
+	var pixels:PackedByteArray=image.pixels;var rect:Array=part.source_rect_xyxy
+	for y in range(maxi(0,int(rect[1])),mini(int(image.height),int(rect[3]))):
+		for x in range(maxi(0,int(rect[0])),mini(int(image.width),int(rect[2]))):
+			if int(pixels[y*int(image.width)+x])!=int(image.map_key):return true
+	return false
+
+static func _background_floor(base:Dictionary,base_id:int)->Dictionary:
+	# Several maps keep their WALKABLE FLOOR in the background bitmap. Their
+	# foreground atlas entries are fully transparent, not reusable floor tiles.
+	# Sample one actual flat clear cell's diamond; never manufacture replacement art.
+	if FT2Content.active==null:return {}
+	var cache_key:=FT2Content.active.profile_id+":"+str(base_id)
+	if _floor_cache.has(cache_key):return _floor_cache[cache_key]
+	var result:Dictionary={};var assets:=FT2IndexedAssets.new()
+	var background_key:="map/"+str(base.get("background_bitmap_name","")).to_lower()
+	if background_key=="map/":_floor_cache[cache_key]=result;return result
+	var background:Dictionary=assets.image(background_key,[[10,112,32]])
+	if background.is_empty():_floor_cache[cache_key]=result;return result
+	var header:Array=base.get("header_0x20_eight_signed_dwords",[])
+	if header.size()<4:_floor_cache[cache_key]=result;return result
+	var pos:=Vector2i(int(header[2])*32+320,int(header[3])*16+240)
+	if int(header[0])!=0:pos.x+=int(-320.0/float(header[0]))
+	if int(header[1])!=0:pos.y+=int(-240.0/float(header[1]))
+	var offset:Array=base.get("base_offset_xy",[0,0]);var pixels:PackedByteArray=background.pixels
+	for cell in base.get("cells",[]):
+		if int(cell.get("H",0))!=0 or int(cell.get("L",0))==0 or int(cell.get("flag2_raw",0))!=0 or int(cell.get("flag3_raw",0))!=0:continue
+		var clear:=true
+		for part in cell.get("parts",[]):
+			if _part_visible(part,base.get("atlas_names",[]),assets):clear=false;break
+		if not clear:continue
+		var center:=Vector2i((int(cell.x)-int(cell.y))*32+int(offset[0]),(int(cell.x)+int(cell.y))*16+int(offset[1]))-pos
+		if center.x<32 or center.y<16 or center.x+32>int(background.width) or center.y+16>int(background.height):continue
+		var floor_pixels:=PackedByteArray();floor_pixels.resize(64*32);floor_pixels.fill(0)
+		var visible:=0
+		for y in range(32):
+			for x in range(64):
+				if absf(float(x)+0.5-32.0)/32.0+absf(float(y)+0.5-16.0)/16.0>1.0:continue
+				var value:=int(pixels[(center.y-16+y)*int(background.width)+center.x-32+x])
+				if value==int(background.map_key):continue
+				floor_pixels[y*64+x]=value;visible+=1
+		if visible<900:continue
+		result={"width":64,"height":32,"pixels":floor_pixels,"palette":background.palette.duplicate(),"map_key":0,
+			"source_kind":"original-background-diamond","source_map":base_id,"source_key":background_key,
+			"source_cell_xy":[int(cell.x),int(cell.y)],"source_center_xy":[center.x,center.y]}
+		break
+	_floor_cache[cache_key]=result;return result

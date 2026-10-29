@@ -20,7 +20,7 @@ SOURCE_FILES={
     'COPYING-converter','CONVERTER_LICENSE.json','LICENSING.md','THIRD_PARTY_NOTICES.md','EXAMPLES_LICENSE',
     'requirements.txt','build-requirements.txt','tools/convert_installation.py',
     'tools/import_content.py','tools/build_converter_binary.py','tools/update_font_charset.py',
-    'tools/package_converter_source.py',
+    'tools/package_converter_source.py','tools/editor_mcp.py',
 }
 
 

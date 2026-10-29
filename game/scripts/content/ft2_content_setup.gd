@@ -17,6 +17,8 @@ var local_defaults: Dictionary = {}
 var _editor
 var _editor_window_size := Vector2i.ZERO
 var _editor_scale_size := Vector2i.ZERO
+var _editor_min_size := Vector2i.ZERO
+var _editor_scale_mode := Window.CONTENT_SCALE_MODE_CANVAS_ITEMS
 
 func _ready() -> void:
 	Engine.max_fps = 60
@@ -140,13 +142,19 @@ func _open_editor() -> void:
 	_editor.play_requested.connect(_test_editor_project)
 	_editor_window_size = get_window().size
 	_editor_scale_size = get_window().content_scale_size
-	get_window().content_scale_size = Vector2i(1100,800)
-	get_window().size = Vector2i(1100,800)
+	_editor_min_size = get_window().min_size
+	_editor_scale_mode = get_window().content_scale_mode
+	get_window().content_scale_mode = Window.CONTENT_SCALE_MODE_DISABLED
+	get_window().content_scale_size = Vector2i.ZERO
+	get_window().min_size = Vector2i(1120,720)
+	get_window().size = Vector2i(1280,840)
 	hide();get_parent().add_child(_editor)
 
 func _close_editor() -> void:
 	if is_instance_valid(_editor): _editor.queue_free()
 	_editor = null
+	get_window().min_size = _editor_min_size
+	get_window().content_scale_mode = _editor_scale_mode
 	get_window().content_scale_size = _editor_scale_size
 	get_window().size = _editor_window_size
 	show()

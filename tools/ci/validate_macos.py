@@ -114,9 +114,9 @@ def main():
     advertised_minimum=str(app_metadata['LSMinimumSystemVersion'])
     minimum_limit=version_tuple(advertised_minimum)
     records=[]
-    def run(name,command,expected=0,timeout=90):
+    def run(name,command,expected=0,timeout=90,extra_env=None):
         result=subprocess.run([str(x)for x in command],capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=timeout,
-                              env=dict(os.environ,GODOT_SILENCE_ROOT_WARNING='1'))
+                              env=dict(os.environ,GODOT_SILENCE_ROOT_WARNING='1',**(extra_env or {})))
         text=result.stdout+result.stderr
         (output/(name+'.log')).write_text(text,encoding='utf-8')
         diagnostics=[line for line in text.splitlines()if line.startswith(('ERROR:','SCRIPT ERROR:'))]
@@ -178,12 +178,19 @@ def main():
     editor_report=json.loads((editor_output/'result.json').read_text(encoding='utf-8'))
     if not editor_report.get('passed')or editor_report.get('source_game_data_used')is not False:
         raise RuntimeError('Content-free editor controls did not pass')
+    baseline_output=output/'editor-baseline';baseline_output.mkdir(parents=True,exist_ok=True)
+    run('editor-original-baseline-synthetic',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_editor_baseline.gd','--',f'--baseline-output={baseline_output}'])
+    baseline_report=json.loads((baseline_output/'result.json').read_text(encoding='utf-8'))
+    if not baseline_report.get('passed')or baseline_report.get('real_cache_checked')is not False or baseline_report.get('original_data_embedded')is not False:
+        raise RuntimeError('Content-free editor baseline regression did not pass')
     run('no-original-data',[launcher,'--headless','--audio-driver','Dummy','--','--check-content',f'--engine-config={output/"absent-connection.json"}'],expected=2)
     if args.gui:
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
     run('graphics-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.test_graphics'])
     run('scenario-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.scenario_support.test_scenario'])
     run('table-audio-save-parser-fixtures',[sys.executable,ROOT/'tools/converters/tables_audio_support/test_conversion.py'])
+    run('editor-mcp-protocol-and-live-bridge',[sys.executable,ROOT/'tools/tests/test_editor_mcp.py','-v'],
+        extra_env={'FT2_BRIDGE_GODOT':str(runtime)})
     run('distributed-converter-help',[sys.executable,'-I',resources/'tools/convert_installation.py','--help'])
     converter=app/'Contents/MacOS/tools/ft2-convert/ft2-convert'
     architecture=run('converter-architecture',['lipo','-archs',converter])
@@ -195,6 +202,16 @@ def main():
     frozen_result=run('bundled-converter-native-self-test',[converter,'--self-test'])
     if json.loads(frozen_result.strip().splitlines()[-1]).get('status')!='self-test-passed':
         raise RuntimeError('Frozen converter native dependencies were not verified')
+    messages=[{'jsonrpc':'2.0','id':1,'method':'initialize','params':{'protocolVersion':'2025-11-25','capabilities':{},'clientInfo':{'name':'ft2-package-validation','version':'1'}}},
+              {'jsonrpc':'2.0','method':'notifications/initialized'},
+              {'jsonrpc':'2.0','id':2,'method':'tools/list'}]
+    frozen_mcp=subprocess.run([str(converter),'--editor-mcp'],input=''.join(json.dumps(row)+'\n'for row in messages),
+                              capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=30)
+    (output/'frozen-editor-mcp.log').write_text(frozen_mcp.stdout+frozen_mcp.stderr,encoding='utf-8')
+    replies=[json.loads(line)for line in frozen_mcp.stdout.splitlines()]
+    if frozen_mcp.returncode or len(replies)!=2 or len(replies[-1].get('result',{}).get('tools',[]))!=14:
+        raise RuntimeError('Bundled MCP stdio server did not negotiate its 14 tools')
+    records.append({'test':'frozen-editor-mcp-stdio','passed':True,'tools':14})
     # Exercise the same ARM-native libraries required for actual conversion.
     from unicorn import Uc,UC_ARCH_X86,UC_MODE_32
     from unicorn.x86_const import UC_X86_REG_EAX
@@ -215,6 +232,8 @@ def main():
             'native_minimum_version_files':len(minimum_records),
             'synthetic_engine_checks':report['checks'],
             'synthetic_extension_checks':extension_report['checks'],'editor_control_checks':editor_report['checks'],
+            'editor_baseline_synthetic_checks':baseline_report['checks'],
+            'editor_mcp_tools':14,'editor_mcp_stdio_verified':True,
             'tests':records,'game_data_used':False,
             'gui_first_setup_verified':args.gui,'real_gameplay_verified':False,
             'scope':'Native arm64 build, app startup/setup, content-free package, synthetic loader/v2 definitions/editor/parser/font/emulator validation. No original game or complete campaign validation.'}

@@ -92,7 +92,10 @@ def _windows_bootloader(root):
 
 def _frozen_entry():
     return '''import json, sys, os
-if sys.argv[1:] == ['--self-test']:
+if sys.argv[1:2] == ['--editor-mcp']:
+    import editor_mcp
+    editor_mcp.main(sys.argv[2:])
+elif sys.argv[1:] == ['--self-test']:
     try:
         def trace(step):
             if os.environ.get('FT2_CONVERTER_TEST_TRACE') == '1': print('FT2_CONVERTER_TEST '+step, file=sys.stderr, flush=True)
@@ -123,6 +126,8 @@ if sys.argv[1:] == ['--self-test']:
         trace('stamp')
         catalog = Path(sys._MEIPASS) / 'converters' / 'font_charset.json'
         assert 215 in json.loads(catalog.read_text(encoding='utf-8'))['codepoints']
+        import editor_mcp
+        assert len(editor_mcp.TOOLS) == 14
         trace('empty-save-slots')
         import tempfile
         from converters.tables_audio import _convert_saves, finalize_save_bindings
@@ -137,7 +142,7 @@ if sys.argv[1:] == ['--self-test']:
         print(json.dumps({'status':'self-test-passed', 'frozen':bool(getattr(sys,'frozen',False)),
                           'pipeline_sha256':stamp, 'cp949':True, 'pillow':version('pillow'),
                           'unicorn':version('unicorn'), 'x86_result':43, 'font_catalog':True,
-                          'empty_save_slots_supported':31}))
+                          'empty_save_slots_supported':31, 'editor_mcp_tools':14}))
     except Exception as error:
         print(json.dumps({'status':'self-test-failed','error':str(error)}))
         raise SystemExit(1)
@@ -219,7 +224,7 @@ a = Analysis(
     pathex=[{str(tools)!r}],
     binaries=pil_bins + unicorn_bins,
     datas=pil_data + unicorn_data + copy_metadata('pillow') + copy_metadata('unicorn') + copy_metadata('pyinstaller') + [({str(tools/'converters/font_charset.json')!r}, 'converters'), ({str(stamp)!r}, '.'), ({str(licenses)!r}, 'licenses')],
-    hiddenimports=pil_hidden + unicorn_hidden + converter_hidden,
+    hiddenimports=pil_hidden + unicorn_hidden + converter_hidden + ['editor_mcp'],
     hookspath=[], hooksconfig={{}}, runtime_hooks=[], excludes={exclusions!r},
     noarchive=False, optimize=0,
 )
@@ -253,11 +258,15 @@ def build_converter(root: Path,destination: Path) -> Path:
         _assert_input(path)
     for path in (tools/'converters').rglob('*.py'):_assert_input(path)
     pipeline=_pipeline_identity(root)
+    mcp_source=tools/'editor_mcp.py'
+    _assert_input(mcp_source)
+    mcp_hash=_sha(mcp_source)
     bootloader_source=_windows_bootloader(root)if os.name=='nt'else None
     work=root/'private/build_converter'/uuid.uuid4().hex
     work.mkdir(parents=True)
     stamp=work/'converter_build.json'
-    stamp.write_text(json.dumps({'pipeline_sha256':pipeline}),encoding='utf-8',newline='\n')
+    identity={'pipeline_sha256':pipeline,'editor_mcp_source_sha256':mcp_hash}
+    stamp.write_text(json.dumps(identity),encoding='utf-8',newline='\n')
     generated=root/'private/generated';generated.mkdir(parents=True,exist_ok=True)
     shutil.copyfile(stamp,generated/'converter_build.json')
     specification=work/'ft2-convert.spec'
@@ -277,13 +286,14 @@ def build_converter(root: Path,destination: Path) -> Path:
     executable=stage/('ft2-convert'+suffix)
     if not executable.is_file():raise RuntimeError('Frozen executable missing')
     actual=json.loads((stage/'_internal/converter_build.json').read_text(encoding='utf-8'))
-    if actual!={'pipeline_sha256':pipeline}:raise RuntimeError('Frozen identity stamp mismatch')
+    if actual!=identity:raise RuntimeError('Frozen identity stamp mismatch')
     if _sha(stage/'_internal/converters/font_charset.json')!=_sha(tools/'converters/font_charset.json'):
         raise RuntimeError('Frozen UI character repertoire missing or stale')
     if platform.system()=='Darwin':
         architecture=subprocess.check_output(['lipo','-archs',str(executable)],text=True).strip().split()
         if architecture!=['arm64']:raise RuntimeError('Mac converter executable is not arm64-only')
     report={'schema':1,'kind':'standalone-converter-binary','pipeline_sha256':pipeline,
+            'editor_mcp_included':True,'editor_mcp_source_sha256':mcp_hash,
             'python':platform.python_version(),'platform':platform.system(),'architecture':platform.machine(),
             'pyinstaller':importlib.metadata.version('pyinstaller'),
             'pillow':importlib.metadata.version('pillow'),'unicorn':importlib.metadata.version('unicorn'),
