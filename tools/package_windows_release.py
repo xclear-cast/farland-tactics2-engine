@@ -32,7 +32,7 @@ def main():
         name=relative.as_posix()
         if path.is_symlink():raise ValueError('Release symlink rejected: '+name)
         if any(part in ('private','__pycache__','.venv','.git')for part in relative.parts):raise ValueError('Private files in release input: '+name)
-        if name in TOP or name.startswith(('tools/','mods/')) or name=='native/bin/ft2synth.dll':files.append((path,name))
+        if name in TOP or name.startswith(('tools/','mods/','docs/')) or name=='native/bin/ft2synth.dll':files.append((path,name))
     output.parent.mkdir(parents=True,exist_ok=True)
     with zipfile.ZipFile(output,'w',compression=zipfile.ZIP_DEFLATED,compresslevel=6)as archive:
         for path,name in files:archive.write(path,'FT2-Windows-x64/'+name)
