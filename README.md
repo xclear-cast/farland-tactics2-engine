@@ -18,14 +18,20 @@
 자신의 운영체제용 ZIP을 받으세요. `Code → Download ZIP`은 개발용 소스이므로
 더블클릭 실행 패키지와 다릅니다. 해당 운영체제의 실행 ZIP이 아직 없다면 빌드 준비 중입니다.
 
-### 글보다 움직이는 설명이 편하다면
+### 실제 폴더 화면에서 빨간 네모만 따라 하세요
 
-![정품 폴더 선택부터 게임 준비와 실행까지, 28초 안내](docs/usage-guide.gif)
+![실제 폴더 캡처로 ZIP과 Windows 실행 파일을 찾는 순서](docs/usage-guide.gif)
 
-[동영상 보기·다운로드](docs/usage-guide.mp4) · [영상 순서를 글로 보기](docs/usage-guide.md)
+[Windows 동영상](docs/usage-guide.mp4) · [사진 순서를 글로 보기](docs/usage-guide.md)
 
-실제 설정 화면을 바탕으로 만든 설명용 예시입니다. 원작 게임 화면은 포함하지 않으며,
-영상에서는 기다리는 시간을 짧게 보여줍니다.
+Mac은 실제 Finder 화면으로 보세요.
+
+![실제 Mac Finder에서 ZIP과 앱을 찾는 순서](docs/usage-guide-mac.gif)
+
+[Mac 동영상](docs/usage-guide-mac.mp4)
+
+호스트 PC 대신 격리된 가상화면의 실제 폴더·앱 창을 촬영하고 누를 곳을 빨간 네모로
+표시했습니다. 정품 폴더 구성은 빈 예시 폴더이며 원작 파일이나 게임 화면은 포함하지 않습니다.
 
 ### 1. 정품 게임 폴더를 확인하세요
 

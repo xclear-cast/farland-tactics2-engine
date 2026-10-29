@@ -1,36 +1,50 @@
 {
   "schema": 1,
-  "seconds": 28,
-  "resolution": [
-    960,
-    720
-  ],
+  "capture_kind": "actual-window-screenshots",
   "instructional_example": true,
   "actual_setup_ui_used": true,
+  "actual_file_manager_windows": true,
+  "capture_environments": [
+    "isolated WSL Xvfb real file manager",
+    "isolated Apple Silicon real Finder"
+  ],
+  "host_desktop_used": false,
   "original_game_data_used": false,
   "original_game_screenshots_used": false,
   "private_paths_displayed": false,
+  "privacy_reviewed": true,
   "font_binary_included": false,
-  "conversion_timing": "Shortened illustration; real initial preparation may take several minutes",
-  "chapters": [
-    "Unzip the whole package into a separate folder",
-    "Open the Windows or Mac start file",
-    "Choose the original game folder",
-    "Identify DATA/MAP/SPRITE/FTO_O.EXE in its parent folder",
-    "Click prepare and wait",
-    "Click connect and launch",
-    "Reopen setup when changing folders or mods"
+  "source_captures_modified": false,
+  "annotations": "Red rectangles added as video overlays; one short Korean caption per step",
+  "fixture_note": "The original-game folder contents are self-authored empty examples. No original game content is published.",
+  "seconds": {
+    "windows": 30,
+    "mac": 27
+  },
+  "resolution": [
+    1280,
+    820
   ],
   "files": [
     {
       "path": "docs/usage-guide.gif",
-      "bytes": 261973,
-      "sha256": "f3fcef730bcd617852d40e2dd47b9be5678b5a5161d59e55ff65594150576de1"
+      "bytes": 617603,
+      "sha256": "b5b380f9026d0db84a457406738c2edc9d23d33b903e5df71a22d5773add14b9"
     },
     {
       "path": "docs/usage-guide.mp4",
-      "bytes": 329361,
-      "sha256": "b9cb2ba7bbb5fe46f220cffab03b10edc49b8fd95ff3b822d1fa98d9de101190"
+      "bytes": 412291,
+      "sha256": "6c49d2d31e34c74bbb73d6889337a0b95b19f08bc85d9194103754c91da288cc"
+    },
+    {
+      "path": "docs/usage-guide-mac.gif",
+      "bytes": 373023,
+      "sha256": "50028b1e91a5660b5a9c11e1de9924007bb7b02c153c7d6a0a335b9edc56ef18"
+    },
+    {
+      "path": "docs/usage-guide-mac.mp4",
+      "bytes": 341846,
+      "sha256": "603176747c927ba91f34bdcdbadf015fe873c9fe64cf71ccbc2c9ff2069eec7a"
     }
   ]
 }

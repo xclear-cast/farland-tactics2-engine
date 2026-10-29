@@ -1,0 +1,17 @@
+{
+  "capture_kind": "actual-window-screenshots",
+  "capture_root": "captures",
+  "canvas": [1280, 800],
+  "caption_height": 72,
+  "caption_font_size": 28,
+  "frames": [
+    {
+      "file": "01-actual-explorer.png",
+      "seconds": 4,
+      "crop": [0, 0, 1200, 700],
+      "masks": [[200, 50, 800, 35]],
+      "boxes": [[50, 140, 360, 50]],
+      "caption": "받은 ZIP 파일을 새 폴더에 모두 풀어 주세요."
+    }
+  ]
+}

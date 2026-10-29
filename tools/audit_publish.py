@@ -20,7 +20,7 @@ TOOL_FILES={'audit_publish.py','build_external.py','build_macos_arm64.py',
             'convert_installation.py','import_content.py','package_converter.py',
             'run_tests.py','update_font_charset.py','build_converter_binary.py','package_windows_release.py','package_converter_source.py'}
 SOURCE_SUFFIXES={'.gd','.gdshader','.gdshaderinc','.uid'}
-DOC_FILES={'docs/usage-guide.gif','docs/usage-guide.mp4','docs/usage-guide.md','docs/usage-guide.json',
+DOC_FILES={'docs/usage-guide.gif','docs/usage-guide.mp4','docs/usage-guide-mac.gif','docs/usage-guide-mac.mp4','docs/usage-guide.md','docs/usage-guide.json',
            'docs/MODDING.md','docs/FORMATS.md','docs/ASSET_POLICY.md'}
 EXAMPLE_FILES={'mods/example_balance/mod.json','mods/example_item_price/mod.json','mods/example_item_price/README.md',
                'mods/example_settings/mod.json','mods/example_settings/README.md',
@@ -59,6 +59,7 @@ def allowed(relative):
     if p.parent==PurePosixPath('tools')and p.name in TOOL_FILES:return True
     if relative.startswith('tools/ci/')and p.suffix in {'.py','.sh'}:return True
     if relative.startswith('tools/guide/')and p.suffix in {'.py','.gd'}:return True
+    if relative=='tools/guide/folder_capture_manifest.example.json':return True
     if relative=='tools/ci/macos_app_launcher.c':return True
     if relative.startswith('.github/workflows/')and p.suffix in {'.yml','.yaml'}:return True
     return False
@@ -70,9 +71,9 @@ def sha(data):return hashlib.sha256(data).hexdigest()
 def inspect(relative,data):
     errors=[]
     if not allowed(relative):return [{'path':relative,'kind':'outside_publication_allowlist'}]
-    if relative in {'docs/usage-guide.gif','docs/usage-guide.mp4'}:
+    if relative in {'docs/usage-guide.gif','docs/usage-guide.mp4','docs/usage-guide-mac.gif','docs/usage-guide-mac.mp4'}:
         document=json.loads((ROOT/'docs/usage-guide.json').read_text(encoding='utf-8'))
-        if not document.get('instructional_example')or document.get('original_game_data_used')is not False or document.get('original_game_screenshots_used')is not False or document.get('private_paths_displayed')is not False:
+        if not document.get('instructional_example')or document.get('original_game_data_used')is not False or document.get('original_game_screenshots_used')is not False or document.get('private_paths_displayed')is not False or document.get('host_desktop_used')is not False or document.get('privacy_reviewed')is not True:
             return [{'path':relative,'kind':'instructional_media_scope_not_verified'}]
         row=next((row for row in document['files']if row['path']==relative),{})
         if row.get('sha256')!=sha(data)or row.get('bytes')!=len(data):errors.append({'path':relative,'kind':'instructional_media_digest_mismatch'})
