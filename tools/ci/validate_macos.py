@@ -167,6 +167,11 @@ def main():
     report=json.loads((synthetic/'godot_result.json').read_text(encoding='utf-8'))
     if not report['passed']:raise RuntimeError('Synthetic data/mod integration did not pass')
     run('setup-audio-contracts',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_setup_audio.gd'])
+    for name,argument in [('portrait_palette','palette'),('actor_job_direction','direction')]:
+        regression_output=output/name;regression_output.mkdir(parents=True,exist_ok=True)
+        run(name,[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/f'game/tests/test_{name}.gd','--',f'--{argument}-output={regression_output}'])
+        regression_report=json.loads((regression_output/'result.json').read_text(encoding='utf-8'))
+        if not regression_report.get('passed'):raise RuntimeError(name+' synthetic runtime regression did not pass')
     # These definitions and the editor's test project are entirely self-authored.
     # Do not add a real installation path/cache or call the local-game validator.
     extension_synthetic=extension_fixtures(output/'extension-synthetic')

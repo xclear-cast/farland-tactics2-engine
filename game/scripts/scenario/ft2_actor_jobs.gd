@@ -50,9 +50,10 @@ func play_path(id: int,stem: String,start: Vector2i,path: Variant,base_label: St
 	_start_step(jobs[id],now)
 	return true
 
-func play_single(id: int,stem: String,start: Vector2i,label: String,now: int,metadata: Dictionary = {}) -> bool:
+func play_single(id: int,stem: String,start: Vector2i,label: String,now: int,metadata: Dictionary = {},direction: int = 4) -> bool:
 	if not jobs.has(id) and jobs.size() >= 128: return false
-	jobs[id] = {"id":id,"stem":stem,"steps":[{"type":0,"source":start,"destination":start,"sort_world":start,"label":label,"flags":1,"direction":4}],"index":0,"world":start,"metadata":metadata.duplicate(true),"path":false,"active":true}
+	# 412190/412250 retain Unit+06 direction even for an unprefixed label.
+	jobs[id] = {"id":id,"stem":stem,"steps":[{"type":0,"source":start,"destination":start,"sort_world":start,"label":label,"flags":17 if direction in [1,2] else 1,"direction":direction}],"index":0,"world":start,"metadata":metadata.duplicate(true),"path":false,"active":true}
 	_start_step(jobs[id],now)
 	return true
 

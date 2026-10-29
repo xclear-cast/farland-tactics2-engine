@@ -889,13 +889,13 @@ func service_script_commands(commands: Array) -> Array:
 
 func _paint_script_surface(target: String, commands: Array) -> void:
 	if target == "main":
-		for command in commands: _draw_overlay(command)
+		for command in commands: _draw_overlay(command,true)
 	else:
 		var backdrop = FT2IndexedSurface.new(640,480,0)
 		if _source_backdrop != null: backdrop.pixels = _source_backdrop.get_data()
 		var original_surface = surface
 		surface = backdrop
-		for command in commands: _draw_overlay(command)
+		for command in commands: _draw_overlay(command,true)
 		surface = original_surface
 		_set_source_backdrop(backdrop.pixels)
 	_dirty = true
@@ -1627,7 +1627,7 @@ func _draw_selection() -> void:
 		marker.play(apd,label,clock_ms,128)
 		_draw_apd(marker,world_to_screen(cell),"system")
 
-func _draw_overlay(command: Dictionary) -> void:
+func _draw_overlay(command: Dictionary, reload_palette: bool = false) -> void:
 	var op = str(command.get("op",""))
 	var pos: Vector2i = command.get("pos",Vector2i.ZERO)
 	if op == "palette_current_entry":
@@ -1678,8 +1678,18 @@ func _draw_overlay(command: Dictionary) -> void:
 		var bitmap = assets.image(str(command.get("key","")),command.get("remaps",[]))
 		if bitmap.is_empty():
 			return
+		if reload_palette:
+			for install in command.get("palette_base_install",[]):
+				# 417D50 updates BASE; tactical shared colors are realized separately.
+				palette.install_base(bitmap.palette,int(install[0]),int(install[1]))
 		for install in command.get("palette_install",[]):
-			_install_once(bitmap,int(install[0]),int(install[1]))
+			if reload_palette:
+				# 41B000 loads/realizes the portrait bands on every acquisition.
+				# Script paint is an event; normal frame draws must preserve fades.
+				palette.install(bitmap.palette,int(install[0]),int(install[1]))
+				_mark_palette_loaded(bitmap,int(install[0]),int(install[1]))
+			else:
+				_install_once(bitmap,int(install[0]),int(install[1]))
 		var rect: Rect2i = command.get("source",Rect2i(0,0,int(bitmap.width),int(bitmap.height)))
 		if command.get("centered",false): pos += Vector2i(int((640-int(bitmap.width))/2),int((480-int(bitmap.height))/2))
 		var dither = int(command.get("dither",0)) if command.get("raw_dither",false) else int(DITHER[clampi(int(command.get("dither",0)),0,8)])
@@ -1697,7 +1707,7 @@ func _draw_overlay(command: Dictionary) -> void:
 		var destination := surface
 		var size: Vector2i = command.get("size",Vector2i(640,480))
 		surface = FT2IndexedSurface.new(size.x,size.y)
-		for child in command.get("commands",[]): _draw_overlay(child)
+		for child in command.get("commands",[]): _draw_overlay(child,reload_palette)
 		var bitmap = {"width":size.x,"height":size.y,"pixels":surface.pixels}
 		surface = destination
 		surface.blit(bitmap,command.get("source",Rect2i(Vector2i.ZERO,size)),pos,int(command.get("transparent",-1)),0,int(command.get("dither",0)),command.get("clip",Rect2i(0,0,640,480)))

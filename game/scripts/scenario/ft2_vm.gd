@@ -611,7 +611,7 @@ func _system(op: int, a: Array) -> bool:
 		20: current_event = 0; palette_requested.emit({"kind":"reset_ranges"})
 		21: _source_surface_fill(0)
 		23: raw_globals["44923C"] = int(a[0])
-		26: actor_busy[slot] = jobs.play_single(slot,_actor_stem(slot),_cell(slot),str(a[1]),now_ms,_job_metadata(slot))
+		26: actor_busy[slot] = jobs.play_single(slot,_actor_stem(slot),_cell(slot),str(a[1]),now_ms,_job_metadata(slot),_read(slot,6))
 		27: _clock_start = now_ms
 		28:
 			if ((now_ms - _clock_start) & 0xFFFFFFFF) < 1000 * int(a[0]): return _wait_again()
@@ -975,7 +975,7 @@ func _dialogue_half_commands(half:int,include_clear:bool=true,include_text:bool=
 	if state.get("portrait",false):
 		var key:="BMP/FACE%02d%s.BMP" % [int(state.speaker),str(state.variant).to_upper()]
 		var size:Vector2i=_bitmap_sizes[key]
-		out.append({"op":"bitmap","key":key,"pos":Vector2i(16,0) if top else Vector2i(384,304),"source":Rect2i(0,0,size.x,size.y-16),"transparent":255,"flip":1 if top else 0,"remaps":[[10,64,144],[74,16,208 if top else 224]],"palette_install":[[144,64],[208 if top else 224,16]]})
+		out.append({"op":"bitmap","key":key,"pos":Vector2i(16,0) if top else Vector2i(384,304),"source":Rect2i(0,0,size.x,size.y-16),"transparent":255,"flip":1 if top else 0,"remaps":[[10,64,144],[74,16,208 if top else 224]],"palette_base_install":[[144,64]],"palette_install":([[144,64]] if alternate_surface else [])+[[208 if top else 224,16]]})
 	if include_text:out.append_array(state.get("commands",[]))
 	return out
 
@@ -995,7 +995,7 @@ func draw_commands() -> Array[Dictionary]:
 		if state.get("portrait",false):
 			var key := "BMP/FACE%02d%s.BMP" % [int(state.speaker),str(state.variant).to_upper()]
 			var size: Vector2i = _bitmap_sizes[key]
-			out.append({"op":"bitmap","key":key,"pos":Vector2i(16,0) if top else Vector2i(384,304),"source":Rect2i(0,0,size.x,size.y-16),"transparent":255,"flip":1 if top else 0,"remaps":[[10,64,144],[74,16,208 if top else 224]],"palette_install":[[144,64],[208 if top else 224,16]]})
+			out.append({"op":"bitmap","key":key,"pos":Vector2i(16,0) if top else Vector2i(384,304),"source":Rect2i(0,0,size.x,size.y-16),"transparent":255,"flip":1 if top else 0,"remaps":[[10,64,144],[74,16,208 if top else 224]],"palette_base_install":[[144,64]],"palette_install":([[144,64]] if alternate_surface else [])+[[208 if top else 224,16]]})
 		out.append_array(state.commands)
 	out.append_array(_title_commands)
 	return out
