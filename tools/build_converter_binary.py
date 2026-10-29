@@ -152,7 +152,11 @@ def _licenses(work):
             f'https://raw.githubusercontent.com/python/cpython/{sys.version_info.major}.{sys.version_info.minor}/LICENSE'],
         directory/'unicorn/COPYING.txt':[
             f'https://raw.githubusercontent.com/unicorn-engine/unicorn/{importlib.metadata.version("unicorn")}/COPYING',
+        ],
+        directory/'unicorn/COPYING.LGPL2':[
             f'https://raw.githubusercontent.com/unicorn-engine/unicorn/{importlib.metadata.version("unicorn")}/COPYING.LGPL2'],
+        directory/'unicorn/COPYING_GLIB':[
+            f'https://raw.githubusercontent.com/unicorn-engine/unicorn/{importlib.metadata.version("unicorn")}/COPYING_GLIB'],
     }
     source_rows=[]
     for path,urls in sources.items():
@@ -165,11 +169,22 @@ def _licenses(work):
                 break
             except Exception as error:errors.append(str(error))
         else:raise RuntimeError('Could not obtain required upstream license notice: '+str(path.name)+'; '+str(errors))
+    # The native Unicorn core is GPLv2 even though its Python wheel metadata
+    # describes the bindings as BSD. Include its matching published source.
+    version=importlib.metadata.version('unicorn')
+    with urllib.request.urlopen(f'https://pypi.org/pypi/unicorn/{version}/json',timeout=30)as response:metadata=json.load(response)
+    artifact=next(item for item in metadata['urls']if item['packagetype']=='sdist')
+    path=directory/'unicorn'/artifact['filename']
+    with urllib.request.urlopen(artifact['url'],timeout=60)as response:path.write_bytes(response.read())
+    if _sha(path)!=artifact['digests']['sha256']:raise RuntimeError('Unicorn corresponding-source archive hash mismatch')
+    source_rows.append({'file':path.relative_to(directory).as_posix(),'url':artifact['url'],'sha256':_sha(path)})
     (directory/'NOTICE_SOURCES.json').write_text(json.dumps(source_rows,indent=2),encoding='utf-8')
     (directory/'THIRD_PARTY_NOTICES.txt').write_text(
         'Bundled converter runtime: CPython, Pillow, Unicorn Engine, and PyInstaller bootloader.\n'
         'See the accompanying license files and installed distribution metadata.\n'
-        'Unicorn upstream source: https://github.com/unicorn-engine/unicorn/tree/'+importlib.metadata.version('unicorn')+'\n'
+        'Unicorn native core: GPLv2; its Python wheel metadata describes the bindings as BSD.\n'
+        'The matching published Unicorn source archive is included in licenses/unicorn/.\n'
+        'Unicorn upstream source: https://github.com/unicorn-engine/unicorn/tree/'+version+'\n'
         'PyInstaller license includes its bootloader distribution exception.\n'
         'No original game files or fonts are bundled by this build.\n',encoding='utf-8')
     return directory
@@ -218,7 +233,10 @@ def build_converter(root: Path,destination: Path) -> Path:
     tools=root/'tools'
     # The repertoire is engine-authored text codepoints, not captured glyphs.
     import runpy
-    runpy.run_path(str(tools/'update_font_charset.py'))['update'](root)
+    if(root/'game/scripts').is_dir():
+        runpy.run_path(str(tools/'update_font_charset.py'))['update'](root)
+    elif not(tools/'converters/font_charset.json').is_file():
+        raise ValueError('Converter-only source archive must include its UI character repertoire')
     for path in (tools/'convert_installation.py',tools/'import_content.py',tools/'converters/font_charset.json'):
         _assert_input(path)
     for path in (tools/'converters').rglob('*.py'):_assert_input(path)
@@ -272,8 +290,14 @@ def build_converter(root: Path,destination: Path) -> Path:
         previous=root/'private/build_converter_previous'/uuid.uuid4().hex
         previous.parent.mkdir(parents=True,exist_ok=True)
         if target.resolve().parent!=destination:raise ValueError('Converter target escaped the destination')
-        shutil.move(str(target),str(previous))
-    shutil.move(str(stage),str(target))
+        # Atomic rename only: shutil.move falls back to copy/delete on a locked
+        # Windows executable, which can partially remove a running bundle.
+        target.rename(previous)
+    if stage.drive.casefold()==target.drive.casefold():
+        stage.rename(target)
+    else:
+        # Cross-volume builds copy to a new target and retain the private stage.
+        shutil.copytree(stage,target,symlinks=True)
     return target/('ft2-convert'+suffix)
 
 

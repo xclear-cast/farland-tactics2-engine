@@ -68,7 +68,9 @@ def main():
          '-I',ROOT/'game/native',ROOT/'game/native/ft2_synth.c','-framework','CoreGraphics','-o',library])
     run(['codesign','--force','--sign','-',library])
     if run(['lipo','-archs',library]).strip()!='arm64':raise RuntimeError('Native module is not arm64 only')
-    run([args.godot,'--headless','--audio-driver','Dummy','--path',ROOT/'game','--editor','--import','--quit'])
+    # Godot #111048: extension documentation can race immediate editor shutdown.
+    # Give the importer a full event-loop interval; never ignore its exit status.
+    run([args.godot,'--headless','--audio-driver','Dummy','--frame-delay','1000','--path',ROOT/'game','--editor','--import','--quit'])
     app=destination/APP_NAME
     macos=app/'Contents/MacOS';resources=app/'Contents/Resources'
     macos.mkdir(parents=True,exist_ok=True);resources.mkdir(parents=True,exist_ok=True)
@@ -93,12 +95,15 @@ def main():
               'CFBundleVersion':'1','LSMinimumSystemVersion':minimum,'LSArchitecturePriority':['arm64'],
               'NSHighResolutionCapable':True,'NSSupportsAutomaticGraphicsSwitching':True}
     (app/'Contents/Info.plist').write_bytes(plistlib.dumps(metadata))
-    # The setup screen locates converter tools beside the actual Godot executable.
-    converter_rows=copy_converter_payload(ROOT,macos)
+    # Keep Python metadata/data under Resources, not macOS's nested-code folders.
+    converter_rows=copy_converter_payload(ROOT,resources)
     copy_converter_payload(ROOT,destination)
-    converter=build_converter(ROOT,macos/'tools')
+    converter=build_converter(ROOT,resources/'converter')
     if not converter.is_file():raise RuntimeError('Bundled converter binary missing')
     if run(['lipo','-archs',converter]).strip()!='arm64':raise RuntimeError('Converter is not arm64 only')
+    bridge=macos/'tools/ft2-convert/ft2-convert';bridge.parent.mkdir(parents=True,exist_ok=True)
+    run(['xcrun','clang','-arch','arm64','-O2','-DFT2_CONVERTER_BRIDGE',ROOT/'tools/ci/macos_app_launcher.c','-o',bridge])
+    run(['codesign','--force','--sign','-',bridge])
     for output in (destination,resources):
         shutil.copyfile(ROOT/'README.md',output/'README.md')
         shutil.copytree(ROOT/'mods',output/'mods',dirs_exist_ok=True)
@@ -115,6 +120,7 @@ def main():
             'app':APP_NAME,'pack_sha256':hashlib.sha256(pack.read_bytes()).hexdigest(),
             'converter_files':converter_rows,'requires_private_legacy_conversion_cache':False,
             'bundled_converter':converter.relative_to(destination).as_posix(),'python_required_for_users':False,
+            'converter_launcher':bridge.relative_to(destination).as_posix(),
             'signing':'local ad-hoc only; no Apple Developer ID or notarization claim','runtime_verified':False}
     (destination/'build_result.json').write_text(json.dumps(result,indent=2),encoding='utf-8')
     archive=ROOT/'dist/FT2-External-macos-arm64.zip'

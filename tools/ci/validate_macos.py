@@ -36,6 +36,17 @@ def main():
         records.append({'test':name,'exit_code':result.returncode,'passed':True})
         return text
     run('signature',['codesign','--verify','--deep','--strict',app])
+    macho_magic={b'\xca\xfe\xba\xbe',b'\xbe\xba\xfe\xca',b'\xca\xfe\xba\xbf',b'\xbf\xba\xfe\xca',
+                 b'\xcf\xfa\xed\xfe',b'\xfe\xed\xfa\xcf'}
+    native_count=0
+    for binary in sorted(app.rglob('*')):
+        if not binary.is_file()or binary.is_symlink():continue
+        with binary.open('rb')as stream:header=stream.read(4)
+        if header not in macho_magic:continue
+        native_count+=1
+        run(f'nested-signature-{native_count}',['codesign','--verify','--strict',binary])
+        if run(f'nested-architecture-{native_count}',['lipo','-archs',binary]).strip()!='arm64':
+            raise RuntimeError('Non-arm64 code in application: '+str(binary.relative_to(app)))
     for binary in (launcher,runtime,resources/'native/bin/libft2synth.macos.arm64.dylib'):
         result=run('architecture-'+binary.name,['lipo','-archs',binary])
         if result.strip()!='arm64':raise RuntimeError('Only arm64 executables may be included')
@@ -51,10 +62,13 @@ def main():
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
     run('graphics-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.test_graphics'])
     run('scenario-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.scenario_support.test_scenario'])
-    run('distributed-converter-help',[sys.executable,'-I',app/'Contents/MacOS/tools/convert_installation.py','--help'])
+    run('distributed-converter-help',[sys.executable,'-I',resources/'tools/convert_installation.py','--help'])
     converter=app/'Contents/MacOS/tools/ft2-convert/ft2-convert'
     architecture=run('converter-architecture',['lipo','-archs',converter])
     if architecture.strip()!='arm64':raise RuntimeError('Bundled converter contains an unsupported architecture')
+    payload=resources/'converter/ft2-convert/ft2-convert'
+    if run('converter-payload-architecture',['lipo','-archs',payload]).strip()!='arm64':
+        raise RuntimeError('Converter payload contains an unsupported architecture')
     run('bundled-converter-help',[converter,'--help'])
     frozen_result=run('bundled-converter-native-self-test',[converter,'--self-test'])
     if json.loads(frozen_result.strip().splitlines()[-1]).get('status')!='self-test-passed':
@@ -73,6 +87,7 @@ def main():
     if not all('215'in style['glyphs']for style in font_metadata['styles']):raise RuntimeError('Engine UI multiplication glyph missing')
     records.append({'test':'arm-native-Pillow-system-font-conversion','passed':True,'styles':font_result['styles']})
     result={'passed':True,'platform':platform.platform(),'architecture':platform.machine(),
+            'signed_arm64_native_files':native_count,
             'synthetic_engine_checks':report['checks'],'tests':records,'game_data_used':False,
             'gui_first_setup_verified':args.gui,'real_gameplay_verified':False,
             'scope':'Native arm64 build, app startup/setup, content-free package, synthetic loader/mod/parser/font/emulator validation. No original game or complete campaign validation.'}

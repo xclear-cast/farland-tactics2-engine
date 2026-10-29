@@ -35,6 +35,16 @@ int main(int argc,char **argv){
     char *slash=strrchr(resolved,'/');
     if(!slash)return 73;
     *slash='\0';
+#ifdef FT2_CONVERTER_BRIDGE
+    char *runtime=join(resolved,"../../../Resources/converter/ft2-convert/ft2-convert");
+    char **arguments=calloc((size_t)argc+1,sizeof(char *));
+    if(!runtime||!arguments)return 74;
+    arguments[0]=runtime;
+    for(int i=1;i<argc;i++)arguments[i]=argv[i];
+    execv(runtime,arguments);
+    perror("FT2 converter could not start");
+    return 76;
+#else
     char *runtime=join(resolved,"GodotRuntime");
     char *resources=join(resolved,"../Resources");
     char *pack=resources?join(resources,"FT2-External.pck"):NULL;
@@ -48,4 +58,5 @@ int main(int argc,char **argv){
     execv(runtime,arguments);
     perror("FT2 External Engine could not start");
     return 76;
+#endif
 }

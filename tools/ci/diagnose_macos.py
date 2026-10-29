@@ -24,16 +24,29 @@ def main():
     shutil.copyfile(empty/'project.godot',native/'project.godot')
     shutil.copytree(ROOT/'game/native',native/'native',dirs_exist_ok=True,ignore=shutil.ignore_patterns('include','*.c'))
     (native/'quit.gd').write_text('extends SceneTree\nfunc _initialize():\n\tvar instance = ClassDB.instantiate("FT2NativeSynth")\n\tinstance = null\n\tquit(0)\n',encoding='utf-8')
+    def cold_copy(name,source):
+        target=output/name
+        shutil.copytree(source,target,dirs_exist_ok=True,ignore=shutil.ignore_patterns('.godot'))
+        return target
+    native_default=cold_copy('native-default-cold',native)
+    native_dummy=cold_copy('native-dummy-cold',native)
+    native_delayed=cold_copy('native-delayed-cold',native)
+    native_runtime=cold_copy('native-runtime',native)
+    (native_runtime/'.godot').mkdir(exist_ok=True)
+    (native_runtime/'.godot/extension_list.cfg').write_text('res://native/ft2_synth.gdextension\n',encoding='utf-8')
     no_extension=output/'full-no-extension'
     shutil.copytree(ROOT/'game',no_extension,dirs_exist_ok=True,ignore=shutil.ignore_patterns('.godot','native'))
+    full_delayed=cold_copy('full-delayed-cold',ROOT/'game')
     cases=[('empty-editor-default',empty,True,False),('empty-runtime',empty,False,True),
-           ('native-editor-default',native,True,False),('native-editor-dummy',native,True,True),
-           ('native-runtime-dummy',native,False,True),('full-no-extension-editor-dummy',no_extension,True,True),
-           ('full-editor-dummy',ROOT/'game',True,True)]
+           ('native-editor-default',native_default,True,False),('native-editor-dummy',native_dummy,True,True),
+           ('native-runtime-dummy',native_runtime,False,True),('full-no-extension-editor-dummy',no_extension,True,True),
+           ('full-editor-dummy',ROOT/'game',True,True),('native-editor-delayed',native_delayed,True,True),
+           ('full-editor-delayed',full_delayed,True,True)]
     reports=[]
     for name,path,editor,dummy in cases:
         command=[str(args.godot),'--headless','--path',str(path)]
         if dummy:command+=['--audio-driver','Dummy']
+        if name.endswith('-delayed'):command+=['--frame-delay','1000']
         command+=['--editor','--import','--quit']if editor else ['--script','res://quit.gd']
         try:
             result=subprocess.run(command,env=dict(os.environ,GODOT_SILENCE_ROOT_WARNING='1'),capture_output=True,text=True,encoding='utf-8',errors='replace',timeout=75)
