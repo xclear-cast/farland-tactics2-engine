@@ -1,0 +1,27 @@
+; Original-data Godot port. UI/gameplay implementation and comparisons are ongoing.
+config_version=5
+
+[application]
+config/name="FT2 External Engine"
+run/main_scene="res://scenes/content_setup.tscn"
+
+[display]
+window/size/viewport_width=640
+window/size/viewport_height=480
+window/size/window_width_override=640
+window/size/window_height_override=480
+window/stretch/mode="canvas_items"
+window/stretch/aspect="keep"
+
+[rendering]
+renderer/rendering_method="gl_compatibility"
+renderer/rendering_method.mobile="gl_compatibility"
+textures/default_filters/use_nearest_mipmap_filter=false
+textures/canvas_textures/default_texture_filter=0
+environment/defaults/default_clear_color=Color(0, 0, 0, 1)
+
+[debug]
+gdscript/warnings/treat_warnings_as_errors=false
+
+[audio]
+driver/mix_rate=44100

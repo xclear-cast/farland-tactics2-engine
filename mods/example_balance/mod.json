@@ -1,0 +1,11 @@
+{
+  "schema": 1,
+  "id": "example_balance",
+  "name": "Example balance changes",
+  "version": "1.0",
+  "table_edits": [
+    {"table": "item", "record": 1, "fields": {"price": 10}},
+    {"table": "magic", "record": 1, "fields": {"mp": 3}}
+  ],
+  "patches": []
+}

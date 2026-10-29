@@ -1,0 +1,2 @@
+# Use an arm64 Python on Apple Silicon so pip selects its native macOS wheel.
+unicorn>=2.1,<3

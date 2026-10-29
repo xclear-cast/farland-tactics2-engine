@@ -1,0 +1,14 @@
+extends SceneTree
+func _initialize() -> void:
+	var failures: Array = []
+	if OS.get_name() != "macOS": failures.append("macOS runtime required")
+	if Engine.get_architecture_name() != "arm64": failures.append("arm64 runtime required")
+	if not ClassDB.class_exists("FT2NativeSynth"): failures.append("arm64 native module missing")
+	else:
+		var synth = ClassDB.instantiate("FT2NativeSynth")
+		if not synth.has_method("sample_startup_modifiers"): failures.append("native startup method missing")
+		synth = null
+	for path in ["res://assets","res://fixtures","res://runtime","res://private"]:
+		if DirAccess.dir_exists_absolute(path): failures.append("Unexpected game content: "+path)
+	print("FT2_MAC_NATIVE ",JSON.stringify({"passed":failures.is_empty(),"failures":failures,"engine":Engine.get_version_info()}))
+	quit(0 if failures.is_empty() else 1)

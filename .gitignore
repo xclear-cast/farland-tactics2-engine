@@ -1,0 +1,45 @@
+private/
+dist/
+.cache/
+**/.godot/
+**/__pycache__/
+*.pyc
+local_setup.json
+.venv/
+
+# Personal launchers and migration helpers are not release sources.
+/Play-*.cmd
+/tools/configure_local.py
+/tools/snapshot_source.py
+/tools/wire_external_paths.py
+/tools/sync_renderer_fix.py
+/tools/sync_ui_detail.py
+/tools/validate_gui.py
+
+# Rebuild native adapters on each supported platform.
+/game/native/bin/
+
+# Game data, generated content and build outputs never belong in source Git.
+/game/assets/
+/game/fixtures/
+/game/runtime/
+/game/data/
+*.pck
+*.exe
+*.dll
+*.so
+*.dylib
+*.pdb
+*.lib
+*.zip
+*.7z
+*.tar
+*.img
+.DS_Store
+._*
+.env
+.env.*
+*.pem
+*.key
+*.p12
+*.pfx

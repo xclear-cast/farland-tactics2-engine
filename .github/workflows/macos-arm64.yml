@@ -1,0 +1,66 @@
+name: macOS Apple Silicon build
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/macos-arm64.yml'
+      - 'game/**'
+      - 'tools/**'
+      - 'mods/**'
+      - 'requirements.txt'
+      - 'README.md'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: macos-arm64-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  apple-silicon:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          architecture: arm64
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            build-requirements.txt
+      - name: Require Apple Silicon
+        run: |
+          test "$(uname -m)" = arm64
+          python -c 'import platform; assert platform.machine() == "arm64"'
+      - name: Install converter dependencies
+        run: python -m pip install -r requirements.txt -r build-requirements.txt
+      - name: Fetch verified official Godot
+        run: |
+          python tools/ci/fetch_godot_macos.py --destination "$RUNNER_TEMP/godot"
+          echo "GODOT=$RUNNER_TEMP/godot/Godot.app/Contents/MacOS/Godot" >> "$GITHUB_ENV"
+      - name: Build arm64 app and converter
+        run: python tools/build_macos_arm64.py --godot "$GODOT"
+      - name: Validate app, converter, and synthetic mods
+        run: python tools/ci/validate_macos.py --gui
+      - name: Upload Apple Silicon app
+        uses: actions/upload-artifact@v4
+        with:
+          name: FT2-macos-arm64
+          path: dist/FT2-External-macos-arm64.zip
+          if-no-files-found: error
+          retention-days: 30
+      - name: Upload bounded validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: macos-arm64-validation
+          path: |
+            private/macos-ci/*.json
+            private/macos-ci/*.log
+          if-no-files-found: warn
+          retention-days: 14
