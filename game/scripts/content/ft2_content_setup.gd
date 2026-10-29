@@ -78,6 +78,7 @@ func _line(parent: VBoxContainer, title: String, value: String, select_file: boo
 	return field
 
 func _build_ui() -> void:
+	set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	var background := ColorRect.new(); background.color = Color("17212f"); background.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT); add_child(background)
 	var margin := MarginContainer.new(); margin.set_anchors_and_offsets_preset(Control.PRESET_FULL_RECT)
 	for side in ["left","top","right","bottom"]: margin.add_theme_constant_override("margin_"+side,18)
@@ -111,7 +112,10 @@ func _browse(field: LineEdit, select_file: bool = false, filters: PackedStringAr
 	add_child(dialog)
 	if select_file: dialog.file_selected.connect(func(path): field.text = path; dialog.queue_free())
 	else: dialog.dir_selected.connect(func(path): field.text = path; dialog.queue_free())
-	dialog.canceled.connect(dialog.queue_free); dialog.popup_centered_ratio(0.85)
+	dialog.canceled.connect(func():
+		dialog.queue_free()
+		if _editor_linking_source:_return_to_editor())
+	dialog.popup_centered_ratio(0.85)
 
 func _capture_fields() -> void:
 	configuration.source_root = source_field.text.strip_edges()
@@ -195,7 +199,14 @@ func _return_to_editor()->void:
 	connect_button.text="연결하고 실행"
 	create_button.text="확장팩 만들기"
 	hide()
-	if is_instance_valid(_editor):_editor.show()
+	if is_instance_valid(_editor):
+		_editor.show()
+		if _editor.has_method("source_connection_finished"):_editor.source_connection_finished()
+
+func _unhandled_key_input(event:InputEvent)->void:
+	if _editor_linking_source and event is InputEventKey and event.pressed and event.keycode==KEY_ESCAPE:
+		_return_to_editor()
+		get_viewport().set_input_as_handled()
 
 func _test_editor_project(folder: String) -> void:
 	var decoder := JSON.new()

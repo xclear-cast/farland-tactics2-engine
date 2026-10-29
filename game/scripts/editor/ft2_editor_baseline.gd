@@ -62,9 +62,10 @@ func skill(skill_id: int) -> Dictionary:return _skills.get(skill_id,{}).duplicat
 func catalog(kind: String,search: String="") -> Array:
 	var source: Dictionary=_characters if kind in ["characters","character","race"] else _skills if kind in ["skills","skill","magic"] else {}
 	var result: Array=[]
+	var query:=search.to_lower().replace("골렘","고렘")
 	for id in source:
 		var row: Dictionary=source[id]
 		if str(row.name).is_empty()or str(row.name)=="결번":continue
 		if source==_skills and int(id)==0:continue
-		if search.is_empty()or (str(id)+" "+str(row.name)).to_lower().contains(search.to_lower()):result.append(row.duplicate(true))
+		if query.is_empty()or (str(id)+" "+str(row.name)).to_lower().replace("골렘","고렘").contains(query):result.append(row.duplicate(true))
 	return result

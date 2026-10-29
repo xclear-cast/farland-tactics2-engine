@@ -198,6 +198,12 @@ def main():
     run('no-original-data',[launcher,'--headless','--audio-driver','Dummy','--','--check-content',f'--engine-config={output/"absent-connection.json"}'],expected=2)
     if args.gui:
         run('first-setup-window',[launcher,'--audio-driver','Dummy','--quit-after','5','--','--setup',f'--engine-config={output/"gui-connection.json"}'],timeout=45)
+        cancel_output=output/'editor-source-cancel';cancel_output.mkdir(parents=True,exist_ok=True)
+        run('original-folder-escape-return',[launcher,'--audio-driver','Dummy','--script',ROOT/'game/tests/test_editor_source_link.gd','--',
+            f'--source-link-output={cancel_output}',f'--source-link-connection={cancel_output/"connection.json"}','--source-link-embedded-esc'],timeout=45)
+        cancel_report=json.loads((cancel_output/'result.json').read_text(encoding='utf-8'))
+        if not cancel_report.get('passed')or not cancel_report.get('synthetic_only'):
+            raise RuntimeError('Original-folder Escape did not restore the editor')
     run('graphics-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.test_graphics'])
     run('scenario-parser-fixtures',[sys.executable,'-m','unittest','tools.converters.scenario_support.test_scenario'])
     run('table-audio-save-parser-fixtures',[sys.executable,ROOT/'tools/converters/tables_audio_support/test_conversion.py'])
@@ -255,6 +261,7 @@ def main():
             'editor_mcp_client_profiles':26,'editor_mcp_client_setting_checks':clients_report['checks'],
             'editor_mcp_tools':14,'editor_mcp_stdio_verified':True,
             'editor_mcp_live_tcp_tests':4,
+            'editor_source_cancel_checks':cancel_report['checks']if args.gui else 0,
             'tests':records,'game_data_used':False,
             'gui_first_setup_verified':args.gui,'real_gameplay_verified':False,
             'scope':'Native arm64 build, app startup/setup, content-free package, synthetic loader/v2 definitions/editor/parser/font/emulator validation. No original game or complete campaign validation.'}

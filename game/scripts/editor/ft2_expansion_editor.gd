@@ -68,6 +68,7 @@ var _scale_window:Window
 var _windowed_mode:=Window.MODE_WINDOWED
 var _windowed_size:=Vector2i(1280,840)
 var _windowed_position:=Vector2i.ZERO
+var _source_mcp_active:=false
 const EditorBridge=preload("res://scripts/editor/ft2_editor_bridge.gd")
 const ClientRegistry=preload("res://scripts/editor/ft2_editor_clients.gd")
 const MapView=preload("res://scripts/editor/ft2_editor_map_view.gd")
@@ -1055,8 +1056,14 @@ func prepare_close()->void:
 
 func _request_source_connection()->void:
 	_commit_pending()
+	_source_mcp_active=bridge!=null and bool(bridge.status().running)
 	_stop_mcp()
 	source_connection_requested.emit()
+
+func source_connection_finished()->void:
+	if _source_mcp_active:
+		_source_mcp_active=false
+		_start_mcp()
 
 func _open_original_folder()->void:
 	if data!=null and DirAccess.dir_exists_absolute(str(data.source_root)):
