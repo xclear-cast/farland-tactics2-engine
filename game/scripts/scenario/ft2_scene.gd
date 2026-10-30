@@ -123,36 +123,74 @@ func _layer(model: Dictionary,id: int) -> Dictionary:
 	return model.layers[id]
 
 func _reset_layer_keys(model: Dictionary,preserve: bool) -> void:
-	var keys: Dictionary = {}
-	if preserve:
-		for id in model.layers: keys[id] = int(model.layers[id].key)
-	model.layers.clear()
-	if preserve:
-		#420E00/427FC0 does not change a layer's existing transparency key.
-		for id in keys: _layer(model,int(id)).key = keys[id]
-	else:
+	#427FC0 zeros motion and the auxiliary offset in all ten layers only.
+	for id in model.layers:
+		if int(id) >= 0 and int(id) < 10: model.layers[id].offset = Vector2i.ZERO
+	if not preserve:
 		#420610/427900: only layer0 is opaque; overlays1..8 use key249.
-		for id in range(9): _layer(model,id).key = -1 if id == 0 else 249
+		for id in range(9):
+			var layer := _layer(model,id)
+			layer.key = -1 if id == 0 else 249
+			layer.visible = true
+			_clear_layer_drawable(layer)
+		model["selected_layer"] = -1 #428D20; the text group itself is not destroyed.
 		model.order = [0,1,2,3,4,5,6,7,8]
 		model.clip = Rect2i(0,0,640,480)
+
+func _clear_layer_drawable(layer: Dictionary) -> void:
+	#427B40 clears destination RECT90, not the source cropBA..C0 or dither config.
+	layer.bitmap = -1; layer.dst = Vector2i.ZERO; layer.fill = maxi(0,int(layer.key)); layer.mask = 0
+	layer["drawable_empty"] = true
+
+func _reset_scene_temporaries(model: Dictionary) -> void:
+	#427FC0/4284B0/429EF0/42A000/42B790; no dither, text or palette-band clear.
+	model.motions.clear(); model.queues.clear(); model.apd_instances.clear(); model.apd_resources.clear(); model.callbacks.clear()
+	model["apd_generation"] = int(model.get("apd_generation",0))+1
+	model["last_released_waves"] = model.wave_slots.values().duplicate()
+	model.wave_slots.clear()
+
+func _cue_state(model: Dictionary,index: int,cue: Dictionary) -> int:
+	if not model.has("cue_states"): model["cue_states"] = {}
+	return int(model.cue_states.get(index,cue.get("initial_runtime_load_state",0)))
+
+func _load_cue(model: Dictionary,selector_id: int,limit: int) -> void:
+	var loaded := 0
+	for index in _cues.size():
+		var cue: Dictionary = _cues[index]
+		var stem := str(cue.bitmap_stem).to_upper()
+		if stem == "NO_ENTRY" or _cue_state(model,index,cue) == 1: continue
+		if int(cue.sequence_selector) != profile or int(cue.cue_index) != selector_id: continue
+		var id := int(cue.resource_id)
+		if id < 0 or id >= 256 or stem == "": continue
+		#4271F0 releases the previous slot before a nonempty filename load,
+		#including a failed load. A failed record does not become loaded1.
+		model.bitmaps.erase(id)
+		if not _sizes.has(stem): continue
+		model.bitmaps[id] = {"stem":stem,"remaps":[[int(cue.load4271F0_arg3),int(cue.load4271F0_arg4),int(cue.load4271F0_arg2)]] if int(cue.load4271F0_arg4) != 0 else []}
+		model.cue_states[index] = 1
+		loaded += 1
+		if limit > 0 and loaded >= limit: break
+
+func _release_cue(model: Dictionary,selector_id: int) -> void:
+	for index in _cues.size():
+		var cue: Dictionary = _cues[index]
+		if str(cue.bitmap_stem).to_upper() == "NO_ENTRY" or int(cue.sequence_selector) != profile or int(cue.cue_index) != selector_id: continue
+		if _cue_state(model,index,cue) == 1: model.bitmaps.erase(int(cue.resource_id))
+		model.cue_states[index] = 2 #41FD90 also marks never-loaded/failed rows2.
 
 func _apply(command: Dictionary,m: Dictionary) -> int:
 	var name := str(command.operation); var a: Array = command.get("args",[])
 	match name:
 		"load_visual_cue","load_cue_reset_local_epoch":
 			if name == "load_cue_reset_local_epoch": m.local_epoch = now
-			for cue in _cues:
-				if int(cue.sequence_selector) != profile or int(cue.cue_index) != int(a[0]): continue
-				var stem := str(cue.bitmap_stem).to_upper()
-				if stem == "NO_ENTRY": continue
-				m.bitmaps[int(cue.resource_id)] = {"stem":stem,"remaps":[[int(cue.load4271F0_arg3),int(cue.load4271F0_arg4),int(cue.load4271F0_arg2)]] if int(cue.load4271F0_arg4) != 0 else []}
+			_load_cue(m,int(a[0]),int(a[1]) if name == "load_visual_cue" and a.size() > 1 else 0)
 		"release_cue_reset_scene":
-			m["last_released_waves"] = m.wave_slots.values().duplicate()
+			_release_cue(m,int(a[0]) if not a.is_empty() else 0)
 			_reset_layer_keys(m,true)
-			m.queues.clear(); m.motions.clear(); m.dithers.clear(); m.wave_slots.clear(); m.apd_instances.clear(); m.apd_resources.clear(); m.credits.clear(); m.callbacks.clear(); m.local_epoch = now
+			_reset_scene_temporaries(m) #44AEF4 local-state reset is captured by the graph edge, not44AF04's epoch.
 		"reset_layer_scene":
 			_reset_layer_keys(m,false)
-			m.queues.clear(); m.motions.clear(); m.dithers.clear()
+			_reset_scene_temporaries(m)
 		"global_epoch_now_plus_offset": m.global_epoch = now+int(a[0])
 		"midi_profile_start_reset_global_epoch": m.global_epoch = now
 		"global_elapsed_le_threshold": return int(_s32(now-int(m.global_epoch)) <= int(a[0]))
@@ -171,9 +209,9 @@ func _apply(command: Dictionary,m: Dictionary) -> int:
 		"layer_visible": _layer(m,int(a[0])).visible = int(a[1]) != 0
 		"layer_aux_offset": _layer(m,int(a[0])).offset = Vector2i(int(a[1]),int(a[2]))
 		"layer_fill_rect":
-			var l := _layer(m,int(a[0])); l.dst = Vector2i(int(a[1]),int(a[2])); l.source = Rect2i(0,0,int(a[3]),int(a[4])); l.fill = int(a[5])
+			var l := _layer(m,int(a[0])); l.bitmap = -1; l.dst = Vector2i(int(a[1]),int(a[2])); l.source = Rect2i(0,0,int(a[3]),int(a[4])); l.fill = int(a[5]); l["drawable_empty"] = false
 		"layer_clear_drawable":
-			var l := _layer(m,int(a[0])); l.bitmap = -1; l.fill = -1
+			_clear_layer_drawable(_layer(m,int(a[0])))
 		"layer_motion","layer_motion_cycles":
 			var flags := int(a[8] if a.size() > 8 else a[7]); var dx := int(a[4]); var dy := int(a[5])
 			if int(a[1]) == -1 or flags & 16: dx = -dx; dy = -dy
@@ -262,6 +300,8 @@ func _apply(command: Dictionary,m: Dictionary) -> int:
 	return 1
 
 func _advance_backend(m: Dictionary) -> void:
+	for id in _players.keys():
+		if not m.apd_instances.has(id): _players.erase(id)
 	#42AA20 services42B5E0 before band cycles and layer motion.42B600 uses
 	#strict signed(now)>signed(epoch+total-tail), then restores and fades black.
 	for id in m.photos.keys():
@@ -332,7 +372,7 @@ func _advance_backend(m: Dictionary) -> void:
 		var instance: Dictionary = m.apd_instances[id]
 		if not m.apd_resources.has(int(instance.resource)) or str(instance.label) == "": continue
 		var resource: Dictionary = m.apd_resources[int(instance.resource)]
-		var identity := "%s:%s:%d:%d" % [str(resource.stem),str(instance.label),int(instance.epoch),int(instance.flags)]
+		var identity := "%s:%s:%d:%d:%d" % [str(resource.stem),str(instance.label),int(instance.epoch),int(instance.flags),int(m.get("apd_generation",0))]
 		var cached: Dictionary = _players.get(id,{})
 		if cached.get("identity","") != identity:
 			var player = preload("res://scripts/render/ft2_apd_player.gd").new()
@@ -383,8 +423,8 @@ func commands() -> Array[Dictionary]:
 			#that surface to MAIN. Its clear color must not erase lower layers.
 			out.append({"op":"indexed_group","commands":children,"size":Vector2i(640,480),"source":layer.source if Rect2i(layer.source).has_area() else Rect2i(0,0,640,480),"pos":pos,"transparent":int(layer.key),"dither":int(layer.mask),"clip":_model.clip})
 			continue
-		if int(layer.fill) >= 0: out.append({"op":"rect","rect":Rect2i(pos,layer.source.size),"filled":true,"color":int(layer.fill)})
-		elif _model.bitmaps.has(int(layer.bitmap)):
+		if int(layer.fill) >= 0 and not layer.get("drawable_empty",false): out.append({"op":"rect","rect":Rect2i(pos,layer.source.size),"filled":true,"color":int(layer.fill)})
+		elif not layer.get("drawable_empty",false) and _model.bitmaps.has(int(layer.bitmap)):
 			var bitmap: Dictionary = _model.bitmaps[int(layer.bitmap)]
 			#42A780 rewrites destinationRECT90 from mask geometry30..36;
 			#the bitmap source cropBA..C0 and auxiliary offsets are retained.
@@ -474,6 +514,7 @@ func _crop(m: Dictionary, layer_id: int, bitmap: int, pos: Vector2i, source: Rec
 	var clipped := dst.intersection(Rect2i(0,0,640,480))
 	l.bitmap = bitmap; l.fill = -1; l.dst = clipped.position
 	l.source = Rect2i(src.position+clipped.position-dst.position,clipped.size)
+	l["drawable_empty"] = false
 
 func _motion_apply(m: Dictionary, layer_id: int, current: Vector2i, motion: Dictionary) -> void:
 	var ref := int(motion.ref); var flags := int(motion.flags)

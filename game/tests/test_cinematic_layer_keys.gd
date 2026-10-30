@@ -63,17 +63,17 @@ func run() -> void:
 	scene._apply({"operation":"reset_layer_scene","args":[]},m)
 	check(m.layers[1].key==249 and m.layers[0].key==-1,"full reset discards previous custom keys")
 	check(m.order==[0,1,2,3,4,5,6,7,8]and m.clip==Rect2i(0,0,640,480),"full reset discards custom draw order and clip")
-	check(m.queues.is_empty()and m.motions.is_empty()and m.dithers.is_empty(),"full reset clears temporary layer activity")
-	check(m.layers.values().all(func(layer):return layer.bitmap==-1 and layer.fill==-1 and layer.mask==0),"full reset clears drawables while retaining initialized layer keys")
-	# Cue release clears temporary contents but is not the complete layer reset.
+	check(m.queues.is_empty()and m.motions.is_empty()and m.dithers[1]=={"own":true},"full reset clears queues/motion while preserving independent dither configuration")
+	check(m.layers.values().all(func(layer):return layer.bitmap==-1 and layer.fill==maxi(0,int(layer.key)) and layer.mask==0 and layer.drawable_empty),"full reset empties destination drawables with the native fill value and keys")
+	# Cue release preserves layer drawables and dither; its own temporary domains end.
 	scene._apply({"operation":"layer_transparent_index","args":[1,41]},m);crop(scene,m,1,1)
 	m.order=[8,1,0];m.clip=Rect2i(3,4,100,80);m.queues[1]={"own":true};m.motions[1]={"own":true};m.dithers[1]={"own":true};m.wave_slots[1]="own-wave";m.callbacks[1]={"own":true};m.apd_instances[1]={"own":true};m.apd_resources[1]={"own":true};scene.now=123
 	scene._apply({"operation":"release_cue_reset_scene","args":[]},m)
 	check(m.layers[1].key==41 and m.layers[0].key==-1 and m.layers[8].key==249,"cue release preserves custom and default transparency keys")
 	check(m.order==[8,1,0]and m.clip==Rect2i(3,4,100,80),"cue release preserves current draw order and clip")
-	check(m.layers.values().all(func(layer):return layer.bitmap==-1 and layer.fill==-1 and layer.source.size==Vector2i.ZERO),"cue release clears old crop contents rather than drawing stale images")
-	check(m.queues.is_empty()and m.motions.is_empty()and m.dithers.is_empty()and m.callbacks.is_empty()and m.apd_instances.is_empty()and m.apd_resources.is_empty(),"cue release clears temporary layer/controller state")
-	check(m.last_released_waves==["own-wave"]and m.wave_slots.is_empty()and m.local_epoch==123,"cue release records released sounds and resets only its local epoch")
+	check(m.layers[1].bitmap==1 and m.layers[1].source==Rect2i(0,0,2,2) and m.layers[1].dst==Vector2i(8,8),"cue release retains existing crop/destination fields")
+	check(m.queues.is_empty()and m.motions.is_empty()and m.dithers[1]=={"own":true}and m.callbacks.is_empty()and m.apd_instances.is_empty()and m.apd_resources.is_empty(),"cue release clears its temporary controllers without erasing dither configuration")
+	check(m.last_released_waves==["own-wave"]and m.wave_slots.is_empty()and m.local_epoch==0,"cue release records released sounds while preserving the separate local epoch")
 	crop(scene,m,1,1)
 	check(m.layers[1].key==41,"a crop after cue release still uses the preserved custom key")
 	scene._apply({"operation":"reset_layer_scene","args":[]},m);crop(scene,m,0,0);crop(scene,m,1,1)

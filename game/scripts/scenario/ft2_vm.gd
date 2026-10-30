@@ -1030,7 +1030,7 @@ func _scene_operation(command: Dictionary) -> void:
 		var path: String = str(scene._model.wave_slots.get(int(args[0]),""))
 		if int(args[1]) != 0: sound_requested.emit(path,false)
 		else: sound_stop_requested.emit(path)
-	elif name in ["release_cue_reset_scene","wave_release_all"]:
+	elif name in ["release_cue_reset_scene","reset_layer_scene","wave_release_all"]:
 		for path in scene._model.get("last_released_waves",[]): sound_stop_requested.emit(str(path))
 	elif name == "palette_copy_bitmap":
 		var bitmap: Dictionary = scene._model.bitmaps.get(int(args[0]),{})
