@@ -134,6 +134,7 @@ func _ready() -> void:
 	vm.measure_text = Callable(view,"measure_text")
 	vm.actor_player_query = Callable(view,"unit_player")
 	vm.actor_busy_query = Callable(view,"script_actor_busy")
+	vm.palette_busy_query = func() -> bool: return view.palette.progress != 128
 	vm.actor_restore_requested.connect(view.restore_script_actor)
 	battle.visual_requested.connect(_visual_requested)
 	battle.actor_visuals_requested.connect(_actor_visuals_requested)
@@ -921,6 +922,7 @@ func _release_runtime() -> void:
 	vm.actor_player_query = Callable()
 	vm.actor_busy_query = Callable()
 	vm.music_busy_query = Callable()
+	vm.palette_busy_query = Callable()
 	vm.scene.measure_text = Callable()
 	vm.overview_visibility = Callable()
 	vm.unit_window_visibility = Callable()

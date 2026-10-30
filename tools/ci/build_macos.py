@@ -100,7 +100,7 @@ def main():
               'CFBundleIdentifier':'org.ft2.external-engine','CFBundleInfoDictionaryVersion':'6.0',
               'CFBundleName':'FT2 External Engine','CFBundleDisplayName':'FT2 External Engine',
               'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.3.1',
-              'CFBundleVersion':'10','LSMinimumSystemVersion':minimum,'LSArchitecturePriority':['arm64'],
+              'CFBundleVersion':'11','LSMinimumSystemVersion':minimum,'LSArchitecturePriority':['arm64'],
               'NSHighResolutionCapable':True,'NSSupportsAutomaticGraphicsSwitching':True}
     (app/'Contents/Info.plist').write_bytes(plistlib.dumps(metadata))
     # Keep Python metadata/data under Resources, not macOS's nested-code folders.

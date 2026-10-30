@@ -45,6 +45,7 @@ var deadline := -1
 var input_wait := false
 var modal_wait := false
 var fade_deadline := 0
+var palette_busy_query: Callable
 var camera_busy := false
 var music_busy := false
 var music_busy_query:Callable
@@ -428,7 +429,10 @@ func _execute(op: int, a: Array) -> bool:
 			_sprite(int(a[0]), {"label":label.trim_prefix("*"),"flags":1 | (16 if int(a[2]) != 0 else 0) | (2 if label.begins_with("*") else 0),"loop":label.begins_with("*"),"play":true,"body_visible":true,"shadow_visible":true})
 			actor_busy[int(a[0])] = true
 		9:
-			if now_ms < fade_deadline: return _wait_again()
+			#417F40 tests the shared palette state, including scene/portrait
+			#requests and immediate requests that stop an earlier global fade.
+			var palette_busy := bool(palette_busy_query.call()) if palette_busy_query.is_valid() else now_ms < fade_deadline
+			if palette_busy: return _wait_again()
 		10:
 			map_requested.emit(int(a[0]))
 		11:
@@ -530,6 +534,7 @@ func _execute(op: int, a: Array) -> bool:
 			palette_requested.emit({"kind":"save_script_base"})
 			bitmap=key
 			_source_commands([{"op":"clear_rect","surface":"main","rect":Rect2i(0,0,640,480),"color":0},{"op":"paint_main","commands":[{"op":"bitmap","key":bitmap,"pos":Vector2i.ZERO,"centered":true,"transparent":-1,"remaps":[[10,208,32]]}]},{"op":"present","mode":"main"}])
+			fade_deadline = now_ms+(int(a[1])&0xFFFF)*128 # Fallback for an unwired standalone VM.
 			palette_requested.emit({"kind":"bitmap","key":bitmap,"interval":int(a[1]),"remaps":[[10,208,32]],"base_start":32,"base_count":208})
 			alternate_surface=true;_surface_fill_index=-1
 		51:
