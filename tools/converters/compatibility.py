@@ -16,6 +16,28 @@ from .scenario_support.core import pe_sections, va_offset
 
 SUPPORTED_EXE_SHA256 = '7437429a63fd5773e152550a59161a1eeefdd3fa3da66cad1d46e232d8097f4c'
 
+# Supported-edition string locations only; the text remains in the user's PE.
+UI_MESSAGE_POINTERS = {
+    'exit_notice': 0x44C454,
+    'item_received': 0x44C434,
+    'item_unavailable': 0x44C410,
+    'skill_learned': 0x44A558,
+    'inventory_full': 0x449738,
+    'currency_received': 0x44971C,
+    'level_changed': 0x44C480,
+    'empty_save_slot': 0x44A74C,
+    'town_save_slot': 0x44A714,
+    'battle_save_slot': 0x44A730,
+    'item_count': 0x44C524,
+    'skill_list_header': 0x44A670,
+    'item_list_header': 0x44A690,
+}
+
+
+def ui_messages(pe) -> dict:
+    """Extract runtime labels into a private cache, without content literals."""
+    return {key: pe.text(address) for key, address in UI_MESSAGE_POINTERS.items()}
+
 
 class PE:
     def __init__(self, path: Path):
@@ -146,6 +168,8 @@ def convert(source: Path, output: Path) -> dict:
     write('data/port_ready/analysis_completion/town/source_evidence.json',{'static_table':{'rows':town}})
     write('data/port_ready/analysis_completion/ui/shared_helpers.json',
           {'contracts':{'source_arrays':{'music_labels':[pe.text(pe.u32(0x449290+4*i)) for i in range(25)]}}})
+    messages = ui_messages(pe)
+    write('data/port_ready/ui/runtime_messages.json', {'messages': messages})
     magic = _source_file(source,'DATA/MAGIC.DAT').read_bytes()
     if len(magic)!=84*64:raise ValueError('Unsupported MAGIC table length')
     prepare = _dispatch(pe,14,64,0x434630,0x43460c,0x432a30)['skill_handlers']
@@ -166,8 +190,8 @@ def convert(source: Path, output: Path) -> dict:
     write('data/port_ready/effects/spec/common_cast_lifecycle.json',{'per_skill_cast_labels':cast_rows})
     offsets = _missile_offsets(pe)
     write('data/port_ready/effects/spec/missile78_contract.json',{'offsets_by_direction':offsets})
-    return {'contracts':6,'dispatch_tables':len(tables),'cast_rows':len(cast_rows),'town_rows':len(town),
-            'music_labels':25,'missile_direction_tables':len(offsets),'legacy_cache_used':False,'source_modified':False}
+    return {'contracts':7,'dispatch_tables':len(tables),'cast_rows':len(cast_rows),'town_rows':len(town),
+            'music_labels':25,'ui_messages':len(messages),'missile_direction_tables':len(offsets),'legacy_cache_used':False,'source_modified':False}
 
 
 if __name__=='__main__':

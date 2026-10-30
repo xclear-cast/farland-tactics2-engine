@@ -20,6 +20,7 @@ func run() -> void:
 		elif arg.begins_with("--real-cache="): real_cache = arg.trim_prefix("--real-cache=")
 		elif arg.begins_with("--real-source="): real_source = arg.trim_prefix("--real-source=")
 	check(mount().ok,"mount synthetic cache")
+	check(FT2Content.ui_text("test_notice","Fallback")=="Fallback","older cache keeps neutral text fallback")
 	var base_profile := FT2Content.active.profile_id
 	var store := FT2Data.new()
 	check(store.raw_table("item").decode_u16(56+20)==30,"base item binary")
@@ -28,6 +29,9 @@ func run() -> void:
 	var low := fixtures.path_join("low")
 	var high := fixtures.path_join("high")
 	check(mount([low]).ok,"mount low-priority mod")
+	check(FT2Content.ui_text("test_notice","") % ["unit",3]=="Synthetic unit / 3","private message template preserves formatting")
+	check(FT2Content.ui_text("empty_notice","Fallback")=="Fallback","empty private text keeps fallback")
+	check(FT2Content.ui_text("invalid_notice","Fallback")=="Fallback","invalid private text keeps fallback")
 	var low_profile := FT2Content.active.profile_id
 	store = FT2Data.new()
 	check(store.raw_table("item").decode_u16(76)==10,"mod item binary")
@@ -43,6 +47,7 @@ func run() -> void:
 	check(base_profile != low_profile,"mod saves isolated from base saves")
 	check(FT2Content.save_root().contains(low_profile),"save path uses mod profile")
 	check(mount([low,high]).ok,"multiple mod layers")
+	check(FT2Content.ui_text("test_notice","") % ["unit",4]=="Overlay unit / 4","text follows active mod precedence")
 	store = FT2Data.new()
 	check(int(store.load_table("item")[1].price)==7,"last mod table edit wins")
 	check(FT2Content.text("custom/hello.txt")=="high","last mod file wins")
@@ -62,6 +67,7 @@ func run() -> void:
 	check(FT2Content.canonical("res://assets/indexed/manifest.json")=="assets/indexed/manifest.json","asset logical path")
 	check(FT2Content.canonical("res://runtime/data/port_ready/maps/index.json")=="data/port_ready/maps/index.json","runtime logical path")
 	check(mount().ok and FT2Content.active.profile_id==base_profile,"disable mods restores original save namespace")
+	check(FT2Content.ui_text("test_notice","Fallback")=="Fallback","private message cache does not leak across mounts")
 	check(FT2Data.new().raw_table("item").decode_u16(76)==30,"mod edit never mutates cache")
 	if real_cache != "": await real_content()
 	var report := {"checks":checks,"failures":failures,"passed":failures.is_empty()}

@@ -167,12 +167,12 @@ func _battle_modal(request: Dictionary) -> void:
 	_elapsed = 0
 	var message := str(request.get("text",""))
 	if request.get("kind","") == "round": message = "턴%d" % int(request.get("round",0))
-	elif request.get("kind","") == "learned_skill": message = "%s(은)는 %s(을)를 기억했다!" % [_unit_name(int(request.unit_slot)),str(data.load_table("magic")[int(request.skill_id)].name)]
+	elif request.get("kind","") == "learned_skill": message = FT2Content.ui_text("skill_learned","%s: %s 습득") % [_unit_name(int(request.unit_slot)),str(data.load_table("magic")[int(request.skill_id)].name)]
 	elif request.get("kind","") == "pickup_item": message = "%s(을)를 손에 넣었다." % str(data.load_table("item")[int(request.item_id)].name)
-	elif request.get("kind","") == "pickup_capacity": message = "그러나, 더이상 갖고 있을 수가 없었다."
-	elif request.get("kind","") == "pickup_gold": message = "%dGold(을)를 손에 넣었다." % int(request.amount)
+	elif request.get("kind","") == "pickup_capacity": message = FT2Content.ui_text("inventory_full","소지품 공간이 부족합니다.")
+	elif request.get("kind","") == "pickup_gold": message = FT2Content.ui_text("currency_received","골드 %d 획득") % int(request.amount)
 	elif request.get("kind","") == "pickup_found": message = "뭔가 찾았다!"
-	elif request.get("kind","") == "levelup": message = "%s(은)는 레벨%d(으)로 올랐다!" % [_unit_name(int(request.unit_slot)),int(request.level)]
+	elif request.get("kind","") == "levelup": message = FT2Content.ui_text("level_changed","%s: 레벨 %d") % [_unit_name(int(request.unit_slot)),int(request.level)]
 	_open("battle_message",0,message)
 	_begin_message_presentation()
 
@@ -625,10 +625,10 @@ func open_save(saving: bool) -> void:
 		var header:=_slot_header(i)
 		var occupied:bool=not header.is_empty()
 		var stamp:int=_timestamp(header.get("system_time_words",[]))
-		var label:="%2d:           미등록" % (i+1);var date:=""
+		var label:=FT2Content.ui_text("empty_save_slot","%2d: 빈 슬롯") % (i+1);var date:=""
 		if occupied:
 			var title:String=data.decode_cp949(str(header.title_cp949_raw_hex).hex_decode())
-			label="%2d: %2d일째  어트랙터  %s" % [i+1,int(header.stage),title] if int(header.round_index)<0 else "%2d: %2d일째  Turn%-3d %s" % [i+1,int(header.stage),mini(999,int(header.round_index)+1),title]
+			label=FT2Content.ui_text("town_save_slot","%2d: %2d일 / 마을 / %s") % [i+1,int(header.stage),title] if int(header.round_index)<0 else FT2Content.ui_text("battle_save_slot","%2d: %2d일 / 턴 %-3d / %s") % [i+1,int(header.stage),mini(999,int(header.round_index)+1),title]
 			var t:Array=header.system_time_words;date="%2d/%2d %2d:%02d" % [int(t[1]),int(t[3]),int(t[4]),int(t[5])]
 		_list.append({"id":i,"text":label,"date":date,"header":header,"occupied":occupied,"stamp":stamp})
 		if saving:
@@ -1030,7 +1030,7 @@ func commands() -> Array[Dictionary]:
 			elif int(row.id)==1077:caption=str(total) if total<=999999 else "많이"
 			elif int(row.id)==1087:caption=str(_quantity_after)
 			elif int(row.id)==1088:caption=str(total)
-			elif int(row.id)==1098 and payload.has("item"):caption="%s(은)는%d개 가지고 있습니다." % [str(data.load_table("item")[int(payload.item)].name),battle.rules.bag_count(battle.inventory,int(payload.item))]
+			elif int(row.id)==1098 and payload.has("item"):caption=FT2Content.ui_text("item_count","%s: %d개 보유") % [str(data.load_table("item")[int(payload.item)].name),battle.rules.bag_count(battle.inventory,int(payload.item))]
 		if dialog=="shop" and int(row.id)==1080:caption=str(battle.money)
 		if dialog in ["save","load"] and int(row.id)==1062:caption="세이브할 장소를 지정해 주십시오" if dialog=="save" else "로드할 데이터를 지정해 주십시오"
 		if row.class_name == "BUTTON":

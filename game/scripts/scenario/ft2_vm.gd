@@ -611,7 +611,7 @@ func _system(op: int, a: Array) -> bool:
 				_sprite(i,{"visible":int(a[0]) != 0})
 		19:
 			_modal_surface_commands.assign([{"op":"clear_rect","surface":"main","rect":Rect2i(0,0,640,480),"color":0},{"op":"present","mode":"main"}])
-			_show_modal({"kind":"message","text":"게임을 종료합니다. 수고하셨습니다."}); return true
+			_show_modal({"kind":"message","text":FT2Content.ui_text("exit_notice","게임을 닫습니다.")}); return true
 		20: current_event = 0; palette_requested.emit({"kind":"reset_ranges"})
 		21: _source_surface_fill(0)
 		23: raw_globals["44923C"] = int(a[0])
@@ -633,7 +633,7 @@ func _system(op: int, a: Array) -> bool:
 			equal_flag = battle.grant_item(slot,int(a[1]),1)
 			var items: Array = data.load_table("item")
 			var item_name := str(items[int(a[1])].name) if int(a[1]) >= 0 and int(a[1]) < items.size() else ""
-			_show_modal({"kind":"message","text":"%s(은)는 %s(을)를 손에 넣었다" % [unit_name(slot),item_name] if equal_flag else "%s(은)는 더이상 가지고 있지 않았다" % unit_name(slot)})
+			_show_modal({"kind":"message","text":FT2Content.ui_text("item_received","%s: %s 획득") % [unit_name(slot),item_name] if equal_flag else FT2Content.ui_text("item_unavailable","%s: 아이템을 사용할 수 없습니다.") % unit_name(slot)})
 			return true
 		39:
 			for i in battle.units.size(): _sprite(i,{"shadow_visible":false})
@@ -702,7 +702,7 @@ func _continue_scene_growth() -> void:
 			for id in magics.size():
 				var row: Dictionary = magics[id]
 				if int(row.get("req_level",0)) == level and (int(row.get("learn_kind_mask",0))&mask) != 0:
-					_scene_growth_notices.append("%s(은)는 %s(을)를 기억했다!" % [unit_name(slot),str(row.name)])
+					_scene_growth_notices.append(FT2Content.ui_text("skill_learned","%s: %s 습득") % [unit_name(slot),str(row.name)])
 		_changed()
 
 func _show_modal(request: Dictionary) -> void:

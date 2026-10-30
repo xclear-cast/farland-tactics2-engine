@@ -11,6 +11,8 @@ var capabilities: Dictionary = {}
 var layers: Array[Dictionary] = []
 var issues: Array[String] = []
 var extensions
+var _ui_messages: Dictionary = {}
+var _ui_messages_loaded := false
 const ExtensionRegistry = preload("res://scripts/extensions/ft2_extension_registry.gd")
 
 const STRIDES := {"item":56,"magic":64,"race":86}
@@ -155,6 +157,17 @@ static func text(path: String) -> String:
 		return JSON.stringify(document) if document != null else ""
 	var resolved := path_for(path)
 	return FileAccess.get_file_as_string(resolved) if resolved != "" and FileAccess.file_exists(resolved) else ""
+
+static func ui_text(key: String, fallback: String) -> String:
+	# Optional for older caches. Original wording is supplied only by user data.
+	if active == null: return fallback
+	if not active._ui_messages_loaded:
+		var document = read_json("data/port_ready/ui/runtime_messages.json")
+		if document is Dictionary and document.get("messages") is Dictionary:
+			active._ui_messages = document.messages
+		active._ui_messages_loaded = true
+	var value = active._ui_messages.get(key)
+	return value if value is String and not value.is_empty() else fallback
 
 static func _plain_json(path: String) -> Variant:
 	if not FileAccess.file_exists(path): return null

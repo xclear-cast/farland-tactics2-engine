@@ -104,7 +104,7 @@ func _populate(resource: int,slot: int) -> void:
 		lists[1040] = _magic_rows.duplicate(true)
 		var chosen := clampi(int(selected.get(1040,0)),0,9)
 		captions[1039] = description("MAGIC",int(lists[1040][chosen].id))
-		lists[1043] = [{"id":0,"text":"명칭                 마력"}]
+		lists[1043] = [{"id":0,"text":FT2Content.ui_text("skill_list_header","이름                 MP")}]
 	elif resource == 118:
 		lists[1023] = []
 		for index in 80:
@@ -112,7 +112,7 @@ func _populate(resource: int,slot: int) -> void:
 			if id != 0 and id < items.size(): lists[1023].append({"id":id,"bag_index":index,"text":str(items[id].name),"count":battle.inventory.decode_s16(index*4+2)})
 		while lists[1023].size() < 9: lists[1023].append({"id":0,"bag_index":80,"text":""})
 		captions[1085] = str(battle.money)
-		lists[1048] = [{"id":0,"text":"명칭               갯수"}]
+		lists[1048] = [{"id":0,"text":FT2Content.ui_text("item_list_header","이름               수량")}]
 		var chosen:=clampi(int(selected.get(1023,0)),0,lists[1023].size()-1)
 		var id:=int(lists[1023][chosen].id)
 		captions[1036]=description("ITEM",id)

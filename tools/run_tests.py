@@ -66,6 +66,10 @@ def fixtures(directory):
         (folder/'hello.txt').write_text(key,encoding='utf-8')
     (directory/'low/files/custom/new.txt').write_text('new',encoding='utf-8')
     dump(directory/'high/files/custom/document.json',{'value':9,'list':[],'remove_me':True})
+    dump(directory/'low/files/data/port_ready/ui/runtime_messages.json',
+         {'messages':{'test_notice':'Synthetic %s / %d','empty_notice':'','invalid_notice':12}})
+    dump(directory/'high/files/data/port_ready/ui/runtime_messages.json',
+         {'messages':{'test_notice':'Overlay %s / %d'}})
     verify(cache)
 
 
