@@ -74,6 +74,9 @@ func _start_step(job: Dictionary,now: int) -> void:
 				if int(frame[3]) >= 0: _prepare_sound(int(frame[3]))
 	if not job.player.step_event.is_connected(_sound_event):job.player.step_event.connect(_sound_event)
 	var ok: bool = job.player.play(dataset,str(step.label),now,int(step.flags))
+	# 4122C0 leaves a failed first selection queued in state1. Only a started
+	# state2 job reaches410FC0;11350 ignores a later step's selection failure.
+	if int(job.index) == 0: job["source_started"] = ok
 	if int(job.index) == 0 and ok and job.player.frame >= 0:
 		job.player.visible = true #41240D shows the newly prepared job sprite.
 	if not ok: errors.append({"id":int(job.id),"stem":job.stem,"label":step.label,"error":"Source APD label lookup returned0"})
@@ -85,7 +88,7 @@ func advance(now: int) -> void:
 	for job in jobs.values():
 		if job.active: job.player.advance(now)
 	for job in jobs.values():
-		if not job.active: continue
+		if not job.active or not job.get("source_started",true): continue
 		if job.player.busy: continue
 		var old_step: Dictionary = job.steps[int(job.index)]
 		job.world = Vector2i(old_step.destination)

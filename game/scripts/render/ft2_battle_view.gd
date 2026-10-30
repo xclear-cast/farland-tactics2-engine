@@ -672,14 +672,22 @@ func set_script_state(state: Dictionary) -> void:
 		if previous.has(id) and previous[id].signature == signature:
 			record = previous[id]
 		else:
-			# Selecting another animation on the same resource retains the pool bit.
-			var player: FT2APDPlayer = previous[id].player if previous.has(id) and str(previous[id].get("actor",{}).get("stem","")) == str(actor.get("stem","")) else FT2APDPlayer.new()
-			player.play(assets.apd(str(actor.get("stem",""))),str(actor.get("label","")),clock_ms,int(actor.get("flags",1)) | (16 if actor.get("mirror",false) else 0))
-			record = {"player":player,"signature":signature,"notified":false}
+			# OP08/42DF50 selects the existing Unit70, even for its first script
+			# command. A failed lookup must retain that pool object's old playback.
+			var player: FT2APDPlayer
+			if previous.has(id) and str(previous[id].get("actor",{}).get("stem","")) == str(actor.get("stem","")):
+				player = previous[id].player
+			elif actor.get("play",false) and "play" in fields and not "stem" in fields and not actor.get("reset_body",false) and _actors.has(id) and str(_actors[id].get("stem","")) == str(actor.get("stem","")):
+				player = _actors[id].player
+			else:
+				player = FT2APDPlayer.new()
+			var selected = player.play(assets.apd(str(actor.get("stem",""))),str(actor.get("label","")),clock_ms,int(actor.get("flags",1)) | (16 if actor.get("mirror",false) else 0))
+			record = {"player":player,"signature":signature,"notified":false,"lookup_ok":selected}
 		record["actor"] = actor
 		if record.player.frame < 0: record.player.visible = false
-		if actor.has("dither") and not actor.has("dither_kind") and not actor.has("dither_target"): record.player.dither = int(actor.dither)
-		record.player.base_flip = 2 if actor.get("flip_y",false) else 0
+		if record.get("lookup_ok",true):
+			if actor.has("dither") and not actor.has("dither_kind") and not actor.has("dither_target"): record.player.dither = int(actor.dither)
+			record.player.base_flip = 2 if actor.get("flip_y",false) else 0
 		_script.players[id] = record
 	var visible_mode = game_mode
 	var cache_mode = int(state.get("actor_cache_mode",game_mode))

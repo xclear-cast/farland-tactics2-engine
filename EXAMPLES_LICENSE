@@ -18,6 +18,10 @@ explicit paths:
 - game/tests/test_editor_clients.gd
 - tools/ci/validate_editor_clients.py
 - game/tests/test_editor_baseline.gd
+- game/tests/test_selection_camera.gd
+- game/tests/test_selection_camera.gd.uid
+- game/tests/test_actor_job_start_failure.gd
+- game/tests/test_actor_job_start_failure.gd.uid
 - docs/MODDING.md
 - docs/FORMATS.md
 - docs/ASSET_POLICY.md
