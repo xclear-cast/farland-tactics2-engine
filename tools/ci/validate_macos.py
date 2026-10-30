@@ -167,7 +167,7 @@ def main():
     report=json.loads((synthetic/'godot_result.json').read_text(encoding='utf-8'))
     if not report['passed']:raise RuntimeError('Synthetic data/mod integration did not pass')
     run('setup-audio-contracts',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_setup_audio.gd'])
-    for name,argument in [('portrait_palette','palette'),('actor_job_direction','direction'),('actor_sprite_reset','sprite'),('story_palette_snapshot','story-palette'),('story_shadow','shadow')]:
+    for name,argument in [('portrait_palette','palette'),('actor_job_direction','direction'),('actor_sprite_reset','sprite'),('story_palette_snapshot','story-palette'),('story_shadow','shadow'),('cinematic_layer_keys','layer-keys')]:
         regression_output=output/name;regression_output.mkdir(parents=True,exist_ok=True)
         run(name,[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/f'game/tests/test_{name}.gd','--',f'--{argument}-output={regression_output}'])
         regression_report=json.loads((regression_output/'result.json').read_text(encoding='utf-8'))

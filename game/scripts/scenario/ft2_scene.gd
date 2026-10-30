@@ -122,6 +122,20 @@ func _layer(model: Dictionary,id: int) -> Dictionary:
 	if not model.layers.has(id): model.layers[id] = {"bitmap":-1,"dst":Vector2i.ZERO,"source":Rect2i(),"visible":true,"key":-1,"offset":Vector2i.ZERO,"mask":0,"fill":-1,"remaps":[]}
 	return model.layers[id]
 
+func _reset_layer_keys(model: Dictionary,preserve: bool) -> void:
+	var keys: Dictionary = {}
+	if preserve:
+		for id in model.layers: keys[id] = int(model.layers[id].key)
+	model.layers.clear()
+	if preserve:
+		#420E00/427FC0 does not change a layer's existing transparency key.
+		for id in keys: _layer(model,int(id)).key = keys[id]
+	else:
+		#420610/427900: only layer0 is opaque; overlays1..8 use key249.
+		for id in range(9): _layer(model,id).key = -1 if id == 0 else 249
+		model.order = [0,1,2,3,4,5,6,7,8]
+		model.clip = Rect2i(0,0,640,480)
+
 func _apply(command: Dictionary,m: Dictionary) -> int:
 	var name := str(command.operation); var a: Array = command.get("args",[])
 	match name:
@@ -134,9 +148,11 @@ func _apply(command: Dictionary,m: Dictionary) -> int:
 				m.bitmaps[int(cue.resource_id)] = {"stem":stem,"remaps":[[int(cue.load4271F0_arg3),int(cue.load4271F0_arg4),int(cue.load4271F0_arg2)]] if int(cue.load4271F0_arg4) != 0 else []}
 		"release_cue_reset_scene":
 			m["last_released_waves"] = m.wave_slots.values().duplicate()
-			m.layers.clear(); m.queues.clear(); m.motions.clear(); m.dithers.clear(); m.wave_slots.clear(); m.apd_instances.clear(); m.apd_resources.clear(); m.credits.clear(); m.callbacks.clear(); m.local_epoch = now
+			_reset_layer_keys(m,true)
+			m.queues.clear(); m.motions.clear(); m.dithers.clear(); m.wave_slots.clear(); m.apd_instances.clear(); m.apd_resources.clear(); m.credits.clear(); m.callbacks.clear(); m.local_epoch = now
 		"reset_layer_scene":
-			m.layers.clear(); m.queues.clear(); m.motions.clear(); m.dithers.clear()
+			_reset_layer_keys(m,false)
+			m.queues.clear(); m.motions.clear(); m.dithers.clear()
 		"global_epoch_now_plus_offset": m.global_epoch = now+int(a[0])
 		"midi_profile_start_reset_global_epoch": m.global_epoch = now
 		"global_elapsed_le_threshold": return int(_s32(now-int(m.global_epoch)) <= int(a[0]))
