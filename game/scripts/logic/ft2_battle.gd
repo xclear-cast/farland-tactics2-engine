@@ -175,6 +175,7 @@ func select_unit(slot: int) -> bool:
 	changed.emit()
 	if u.decode_u16(18) != 0 or u.decode_u16(16) in rules.INCAP: return false
 	if u.decode_s32(92) != 0 and u.decode_s32(96) != 0: return false
+	camera_requested.emit({"kind":"actor","slot":slot,"source":"WM_COMMAND102/403540+4034B0"})
 	rollback_origin = rules.xy(u)
 	rollback_facing = u.decode_u16(6)
 	path.clear()
