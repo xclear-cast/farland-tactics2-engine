@@ -43,6 +43,7 @@ var _camera_motion: Dictionary = {}
 var _dirty = true
 var _hover = Vector2i(-1,-1)
 var _installed: Dictionary = {}
+var _script_saved_base: PackedByteArray = PackedByteArray() #4621D0, normalized RGB.
 var environment
 var physical
 var magic
@@ -438,6 +439,7 @@ func _refresh_actors() -> void:
 			shadow += signi(shadow)
 		if shadow != 0 and map_id != 69:
 			var shadow_label = "SMALL" if shadow == 1 else "MIDDLE" if shadow == 2 else "LARGE" if shadow == 3 else "HUGE"
+			shadow_label += ".M" #4195E3: native actor shadows use the masked variant.
 			if not live[slot].has("shadow") or live[slot].get("shadow_label","") != shadow_label:
 				var player = FT2APDPlayer.new()
 				player.play(assets.apd("SYSTEM"),shadow_label,clock_ms,128)
@@ -553,6 +555,12 @@ func set_script_state(state: Dictionary) -> void:
 					actor["stem"] = str(_actors[id].stem)
 					actor["player_override"] = _actors[id].player
 				else: continue
+		if actor.get("reset_body",false) and "reset_body" in fields:
+			if serial != int(_script_commands_seen.get(id,-1)):
+				actor = _empty_script_body(id,actor)
+			elif not actor.has("player_override") and previous.has(id):
+				actor = actor.duplicate()
+				actor["player_override"] = previous[id].player
 		if str(actor.get("stem","")) == "":
 			if actor.has("player_override"):
 				var external = {"player":actor.player_override,"signature":"external","notified":false,"actor":actor,"external":true}
@@ -572,7 +580,7 @@ func set_script_state(state: Dictionary) -> void:
 			player.play(assets.apd(str(actor.get("stem",""))),str(actor.get("label","")),clock_ms,int(actor.get("flags",1)) | (16 if actor.get("mirror",false) else 0))
 			record = {"player":player,"signature":signature,"notified":false}
 		record["actor"] = actor
-		record.player.visible = bool(actor.get("visible",true))
+		record.player.visible = bool(actor.get("visible",true)) and record.player.frame >= 0
 		if actor.has("dither") and not actor.has("dither_kind") and not actor.has("dither_target"): record.player.dither = int(actor.dither)
 		record.player.base_flip = 2 if actor.get("flip_y",false) else 0
 		_script.players[id] = record
@@ -583,6 +591,23 @@ func set_script_state(state: Dictionary) -> void:
 	game_mode = visible_mode
 	for actor in state.get("sprites",[]): _apply_script_actor_properties(actor)
 	_dirty = true
+
+func _empty_script_body(slot: int,actor: Dictionary) -> Dictionary:
+	# 43DAC2..43DB0E replaces Unit70 with 42DB30's allocated, unplayed sprite.
+	# It is not a default SET pose. Only a later OP08/job selects an animation.
+	var base: Dictionary = _actors.get(slot,{})
+	var stem = str(actor.get("stem",base.get("stem","")))
+	var blank = FT2APDPlayer.new()
+	blank.apd = FT2APDPlayer.normalize(assets.apd(stem)) if stem != "" else {}
+	blank.visible = false
+	if not base.is_empty():
+		base.player = blank
+		if base.has("shadow"): base.shadow.visible = false
+	var result = actor.duplicate()
+	result["stem"] = stem
+	result["player_override"] = blank
+	result["label"] = ""
+	return result
 
 func _apply_script_actor_properties(actor: Dictionary) -> void:
 	var id = int(actor.get("id",-1))
@@ -619,8 +644,10 @@ func _apply_script_actor_properties(actor: Dictionary) -> void:
 				sweat.play(assets.apd("SYSTEM"),("F." if direction <= 1 else "B.")+"SWEAT",clock_ms,1|(16 if direction in [1,2] else 0))
 				_script_unit78[id] = sweat
 	if actor.has("priority"): record["priority"] = int(actor.priority)
-	if actor.has("visible") and ("visible" in fields or not fresh):
-		player.visible = bool(actor.visible)
+	if fresh and actor.has("body_visible") and "body_visible" in fields:
+		player.visible = bool(actor.body_visible) and player.frame >= 0
+	if fresh and actor.has("visible") and "visible" in fields:
+		player.visible = bool(actor.visible) and player.frame >= 0
 		for name in ["shadow","icon"]:
 			if base.has(name): base[name].visible = bool(actor.visible)
 		if _script_unit78.has(id): _script_unit78[id].visible = bool(actor.visible)
@@ -687,6 +714,16 @@ func camera_request(request: Dictionary) -> void:
 
 func palette_request(request: Dictionary) -> void:
 	var kind = str(request.get("kind",""))
+	if kind == "save_script_base":
+		# OP50/52 use one overwriteable slot (native417E70 stores BGRQUAD).
+		_script_saved_base = palette.base.duplicate()
+		return
+	if kind == "restore_script_base":
+		if _script_saved_base.is_empty():
+			_script_saved_base.resize(768); _script_saved_base.fill(0)
+		# OP51/417E10 copies only BASE10..245. No hardware/fade realization.
+		palette.install_base(_script_saved_base,10,236)
+		return
 	if kind == "surface_fill":
 		source_surface_fill(int(request.get("color",0)),bool(request.get("present",true)))
 		return
@@ -1428,6 +1465,28 @@ func _drawable_rect(record: Dictionary) -> Rect2i:
 	point.y += (-int(bounds[3]) if flip&2 else int(bounds[1]))-int(frame.pivot)
 	return Rect2i(point,Vector2i(int(bounds[2])-int(bounds[0]),int(bounds[3])-int(bounds[1]))).intersection(Rect2i(0,0,640,480))
 
+func _script_shadow_anchor(slot: int,cell: Vector2i) -> Vector2i:
+	var anchor := world_to_screen(cell)
+	var record: Dictionary = _script.get("players",{}).get(slot,{})
+	if record.is_empty(): return anchor
+	var actor: Dictionary = record.get("actor",{})
+	if not bool(actor.get("job_shadow_follow",false)): return anchor
+	# 410E10 projects Unit70's composed X onto the current step's ground line.
+	# Preserve arithmetic-shift rounding for odd negative displacements.
+	var source: Vector2i = world_to_screen(actor.get("world",cell))
+	var adjust: Vector2i = record.get("base_adjust",Vector2i.ZERO) if record.get("adjust_camera",camera) == camera else Vector2i.ZERO
+	var body: Vector2i = actor.get("pos",source)+adjust+record.player.offset
+	var dx := source.x-body.x
+	var direction := int(actor.get("job_direction",4))
+	var dy: int = ((-dx if direction in [0,3] else dx)>>1) if direction in [0,1,2,3] else source.y
+	return Vector2i(body.x,source.y-dy)
+
+func _script_shadow_depth(slot: int,cell: Vector2i) -> int:
+	var actor: Dictionary = _script.get("players",{}).get(slot,{}).get("actor",{})
+	if not bool(actor.get("job_shadow_follow",false)): return cell.x+cell.y
+	var sort_world: Vector2i = actor.get("sort_world",actor.get("world",cell))
+	return sort_world.x+sort_world.y
+
 func _redraw_map(diagonal: int, group: int, dirty: Array) -> void:
 	if dirty.is_empty():
 		return
@@ -1512,7 +1571,7 @@ func _render(present: bool = true, copy_mode: bool = false) -> void:
 		var u = _unit(int(record.slot))
 		var cell = Vector2i(u.x,u.y)
 		if record.has("shadow"):
-			drawables.append({"player":record.shadow,"anchor":world_to_screen(cell),"depth":cell.x+cell.y,"priority":2,"policy":"system"})
+			drawables.append({"player":record.shadow,"anchor":_script_shadow_anchor(int(record.slot),cell),"depth":_script_shadow_depth(int(record.slot),cell),"priority":2,"policy":"system"})
 		if record.has("icon") and not _script_unit78.has(record.slot):
 			drawables.append({"player":record.icon,"anchor":world_to_screen(cell)-Vector2i(0,int(record.icon_y)),"depth":cell.x+cell.y,"priority":5,"policy":"system"})
 		if _script_unit78.has(record.slot):

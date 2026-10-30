@@ -419,10 +419,11 @@ func _execute(op: int, a: Array) -> bool:
 		6: _add_dialogue(str(a[0]))
 		7:
 			_last_resource_stem = "CHAR_%02d%s" % [_read(int(a[0]),2),String.chr(int(a[1])).to_upper()]
-			_sprite(int(a[0]), {"variant":String.chr(int(a[1])),"stem":_last_resource_stem,"label":""})
+			# OP07 falls through the OP33 empty-Unit70 replacement at 43DAC2.
+			_sprite(int(a[0]), {"variant":String.chr(int(a[1])),"stem":_last_resource_stem,"label":"","reset_body":true,"shadow_visible":false})
 		8:
 			var label := str(a[1])
-			_sprite(int(a[0]), {"label":label.trim_prefix("*"),"flags":1 | (16 if int(a[2]) != 0 else 0) | (2 if label.begins_with("*") else 0),"loop":label.begins_with("*"),"play":true})
+			_sprite(int(a[0]), {"label":label.trim_prefix("*"),"flags":1 | (16 if int(a[2]) != 0 else 0) | (2 if label.begins_with("*") else 0),"loop":label.begins_with("*"),"play":true,"body_visible":true,"shadow_visible":true})
 			actor_busy[int(a[0])] = true
 		9:
 			if now_ms < fade_deadline: return _wait_again()
@@ -486,7 +487,7 @@ func _execute(op: int, a: Array) -> bool:
 		31:
 			if int(a[1]) != 4: _write(int(a[0]), 6, int(a[1]))
 		32: _jump(str(a[0]))
-		33: _sprite(int(a[0]), {"visible":true})
+		33: _sprite(int(a[0]), {"reset_body":true,"label":"","shadow_visible":false})
 		34:
 			if camera_busy: return _wait_again()
 			return true
@@ -524,14 +525,17 @@ func _execute(op: int, a: Array) -> bool:
 		50:
 			var key:="BMP/" + str(a[0]).to_upper() + ".BMP"
 			if not _bitmap_sizes.has(key):return false #43E70D failure logs and resumes, without switching context.
+			palette_requested.emit({"kind":"save_script_base"})
 			bitmap=key
 			_source_commands([{"op":"clear_rect","surface":"main","rect":Rect2i(0,0,640,480),"color":0},{"op":"paint_main","commands":[{"op":"bitmap","key":bitmap,"pos":Vector2i.ZERO,"centered":true,"transparent":-1,"remaps":[[10,208,32]]}]},{"op":"present","mode":"main"}])
 			palette_requested.emit({"kind":"bitmap","key":bitmap,"interval":int(a[1]),"remaps":[[10,208,32]],"base_start":32,"base_count":208})
 			alternate_surface=true;_surface_fill_index=-1
 		51:
+			palette_requested.emit({"kind":"restore_script_base"})
 			_source_commands([{"op":"restore","targets":["main","backdrop"]}])
 			alternate_surface=false;_surface_fill_index=-1;bitmap = ""; dialogue.clear(); dialogue_halves.clear(); _title_commands.clear()
 		52:
+			palette_requested.emit({"kind":"save_script_base"})
 			alternate_surface=true;mode = 8; scene.start(int(a[0])); scene_requested.emit(int(a[0])); return true
 		53: _battle_reset()
 		54:
@@ -813,12 +817,15 @@ func _set_complete_flag(value:int)->void:
 func _sprite(slot: int, changes: Dictionary) -> void:
 	if slot < 0: return
 	var state: Dictionary = actor_sprites.get(slot,{"id":slot,"visible":true,"label":"","world":_cell(slot)})
-	if changes.get("play",false) or changes.has("stem"):
+	if changes.get("play",false) or changes.has("stem") or changes.get("reset_body",false):
 		state.erase("player_override")
 		if jobs!=null and not jobs.is_busy(slot):jobs.clear(slot) # Replacing Unit70 invalidates a completed job's old visual alias.
 	if changes.get("play",false):
 		if str(state.get("stem","")) == "": state["stem"] = _actor_stem(slot)
 		state["restart_serial"] = int(state.get("restart_serial",0))+1
+	if changes.has("body_visible"):
+		# OP08 shows Unit70 and Unit74, without showing Unit78 status sprites.
+		state["visible"] = bool(changes.body_visible)
 	state.merge(changes,true)
 	state["command_serial"]=int(state.get("command_serial",0))+1
 	state["changed_fields"]=changes.keys()

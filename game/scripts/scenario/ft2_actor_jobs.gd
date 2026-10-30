@@ -74,6 +74,8 @@ func _start_step(job: Dictionary,now: int) -> void:
 				if int(frame[3]) >= 0: _prepare_sound(int(frame[3]))
 	if not job.player.step_event.is_connected(_sound_event):job.player.step_event.connect(_sound_event)
 	var ok: bool = job.player.play(dataset,str(step.label),now,int(step.flags))
+	if int(job.index) == 0 and ok and job.player.frame >= 0:
+		job.player.visible = true #41240D shows the newly prepared job sprite.
 	if not ok: errors.append({"id":int(job.id),"stem":job.stem,"label":step.label,"error":"Source APD label lookup returned0"})
 	cell_committed.emit(int(job.id),Vector2i(step.source))
 	changed.emit()
@@ -106,7 +108,8 @@ func snapshots() -> Array[Dictionary]:
 	for job in jobs.values():
 		out.append({"id":int(job.id),"stem":str(job.stem),"label":str(job.steps[mini(int(job.index),job.steps.size()-1)].label),
 			"world":Vector2i(job.world),"sort_world":Vector2i(job.sort_world),"player_override":job.player,
-			"externally_advanced":true,"metadata":job.metadata,"visible":true})
+			"externally_advanced":true,"metadata":job.metadata,"visible":true,
+			"job_shadow_follow":bool(job.active) or not bool(job.path),"job_direction":int(job.steps[mini(int(job.index),job.steps.size()-1)].direction)})
 	return out
 
 func clear(id: int = -1) -> void:
