@@ -99,8 +99,8 @@ def main():
     metadata={'CFBundleDevelopmentRegion':'en','CFBundleExecutable':'FT2External',
               'CFBundleIdentifier':'org.ft2.external-engine','CFBundleInfoDictionaryVersion':'6.0',
               'CFBundleName':'FT2 External Engine','CFBundleDisplayName':'FT2 External Engine',
-              'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.3.7',
-              'CFBundleVersion':'22','LSMinimumSystemVersion':minimum,'LSArchitecturePriority':['arm64'],
+              'CFBundlePackageType':'APPL','CFBundleShortVersionString':'0.3.8',
+              'CFBundleVersion':'23','LSMinimumSystemVersion':minimum,'LSArchitecturePriority':['arm64'],
               'NSHighResolutionCapable':True,'NSSupportsAutomaticGraphicsSwitching':True}
     (app/'Contents/Info.plist').write_bytes(plistlib.dumps(metadata))
     # Keep Python metadata/data under Resources, not macOS's nested-code folders.

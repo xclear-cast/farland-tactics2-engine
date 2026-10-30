@@ -672,6 +672,8 @@ func _next_party() -> void:
 		view.center_on_unit(slot)
 		mouse_cell = Vector2i(unit.decode_s32(8),unit.decode_s32(12))
 		ui.hover_cell(mouse_cell,_pointer.x)
+		#4042E0/40033 presents408580 after centering, before the blocking menu.
+		view.draw_tactical_now()
 		ui.open_action_menu(_pointer)
 		return
 	ui.command(40009)

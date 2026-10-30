@@ -30,6 +30,8 @@ explicit paths:
 - game/tests/test_actor_job_wait.gd.uid
 - game/tests/test_source_game_mode.gd
 - game/tests/test_source_game_mode.gd.uid
+- game/tests/test_next_party_presentation.gd
+- game/tests/test_next_party_presentation.gd.uid
 - docs/MODDING.md
 - docs/FORMATS.md
 - docs/ASSET_POLICY.md
