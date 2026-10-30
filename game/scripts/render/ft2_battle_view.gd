@@ -1012,10 +1012,14 @@ func set_experience_palette_scope(begin: bool) -> void:
 			var value = palette.get(key)
 			_experience_palette_snapshot[key] = value.duplicate() if value is PackedByteArray else value
 		_experience_palette_snapshot["installed"] = _installed.duplicate()
+		_experience_palette_snapshot["overlay"] = _overlay.duplicate(true)
 	elif not _experience_palette_snapshot.is_empty():
 		for key in _experience_palette_snapshot:
-			if key != "installed": palette.set(key,_experience_palette_snapshot[key])
+			if key not in ["installed","overlay"]: palette.set(key,_experience_palette_snapshot[key])
 		_installed = _experience_palette_snapshot.installed.duplicate()
+		# A growth notice can redraw synchronously from EXP.finished, before the
+		# next Main frame replaces the closed dialog's WALL command list.
+		_overlay = _experience_palette_snapshot.overlay.duplicate(true)
 		_experience_palette_snapshot.clear()
 		palette.dirty = true; _dirty = true
 
