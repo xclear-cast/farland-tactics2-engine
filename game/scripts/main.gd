@@ -101,6 +101,7 @@ func _ready() -> void:
 	battle = Combat.new(data)
 	view = View.new(); add_child(view); view.configure(data); view.set_battle(battle)
 	vm = Scenario.new(data,battle)
+	battle.navigation.set_game_mode_owner(vm) #4499BC is live scenario mode, not Town/control data.
 	ui = Interface.new(); ui.configure(data,battle,vm)
 	ui.experience.palette_scope_requested.connect(view.set_experience_palette_scope)
 	exit_request=ExitRequest.new();exit_request.configure(data,battle,vm)
@@ -245,7 +246,7 @@ func _load_test_snapshot(path: String) -> void:
 	var fields: Dictionary = snapshot.fields
 	battle.round_index = int(fields.get("round_index",battle.round_index))
 	battle.rng = fields.rng.duplicate()
-	battle.navigation.configure(battle.units,battle.map_data,vm.control_mode)
+	battle.navigation.configure(battle.units,battle.map_data,int(vm.mode))
 	battle.changed.emit()
 	view.camera = Vector2i(int(fields.camera[0]),int(fields.camera[1]))
 	view.pan_camera(Vector2i.ZERO)
@@ -254,7 +255,7 @@ func _load_test_snapshot(path: String) -> void:
 func _set_map(map_id: int) -> void:
 	battle.map_id = map_id
 	battle.map_data = data.load_map(map_id) if map_id >= 0 else {}
-	battle.navigation.configure(battle.units,battle.map_data,vm.control_mode)
+	battle.navigation.configure(battle.units,battle.map_data,int(vm.mode))
 	view.set_map(map_id)
 	_record_event({"frame":frame_number,"map":map_id})
 

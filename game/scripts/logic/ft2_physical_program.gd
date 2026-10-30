@@ -422,7 +422,8 @@ func build(action_plan: Dictionary) -> Dictionary:
 	var body = _record(_actor_slot,0,_body_stem)
 	var run = int(plan.get("accepted_run",0)) != 0
 	var direction = int(plan.get("direction",_actor.decode_u16(6)))
-	var flying = int(plan.get("game_mode",navigation.map_mode)) == 1 and (rules.races.decode_u16(_actor.decode_u16(2)*86+62) != 99 or _actor.decode_u16(16) == 11 or rules.has_ability(_actor,11))
+	var source_mode = navigation.current_game_mode() if navigation.has_method("current_game_mode") else navigation.map_mode
+	var flying = int(plan.get("game_mode",source_mode)) == 1 and (rules.races.decode_u16(_actor.decode_u16(2)*86+62) != 99 or _actor.decode_u16(16) == 11 or rules.has_ability(_actor,11))
 	var route = bool(plan.get("native_route",flying))
 	if flying and run and not results.is_empty(): _fly_dash(body,path,direction)
 	else:

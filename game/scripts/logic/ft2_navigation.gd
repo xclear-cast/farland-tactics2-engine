@@ -8,6 +8,14 @@ var cells: Dictionary = {}
 var base = Vector2i.ZERO
 var canvas = Vector2i(640,480)
 var map_mode = 1
+var _game_mode_owner: WeakRef
+
+func set_game_mode_owner(owner: Object) -> void:
+	_game_mode_owner = weakref(owner) if owner != null else null
+
+func current_game_mode() -> int:
+	var owner = _game_mode_owner.get_ref() if _game_mode_owner != null else null
+	return int(owner.mode) if owner != null else map_mode
 var actor_slot = -1
 var origin = Vector2i.ZERO
 var grid: Dictionary = {}
@@ -56,7 +64,7 @@ static func facing(a: Vector2i,b: Vector2i) -> int:
 
 func floating(slot: int) -> bool:
 	var u: PackedByteArray = units[slot]
-	return map_mode == 1 and (rules.races.decode_u16(u.decode_u16(2)*86+62) != 99 or u.decode_u16(16) == 11 or rules.has_ability(u,11))
+	return current_game_mode() == 1 and (rules.races.decode_u16(u.decode_u16(2)*86+62) != 99 or u.decode_u16(16) == 11 or rules.has_ability(u,11))
 
 func limits(slot: int) -> Vector2i:
 	if floating(slot): return Vector2i(99,99)

@@ -422,7 +422,7 @@ func _run_flag(actor: PackedByteArray, records: Array) -> int:
 		if d != direction: return 0
 	if actor.decode_u16(6) != direction: return 0
 	var l0 = rules.races.decode_u16(actor.decode_u16(2)*86+62)
-	if navigation.map_mode == 1 and l0 == 99 and (actor.decode_u16(16) == 11 or rules.has_ability(actor,11)): return 0
+	if navigation.current_game_mode() == 1 and l0 == 99 and (actor.decode_u16(16) == 11 or rules.has_ability(actor,11)): return 0
 	var point = rules.xy(actor)
 	for d in path:
 		var next = point+navigation.DIRS[d]
@@ -463,7 +463,7 @@ func _commit_numeric() -> void:
 		if slot >= 0:
 			var record_origin: Vector2i = record.origin
 			var first = int(records[0].get("amount",0))
-			var numeric = rules.apply_numeric(units[selected_slot],units[slot],action_id,rng,slot,slot == selected_slot,first,navigation.map_mode,navigation.height(record_origin)-navigation.height(rules.xy(units[slot])),[record_origin.x,record_origin.y],run)
+			var numeric = rules.apply_numeric(units[selected_slot],units[slot],action_id,rng,slot,slot == selected_slot,first,navigation.current_game_mode(),navigation.height(record_origin)-navigation.height(rules.xy(units[slot])),[record_origin.x,record_origin.y],run)
 			units[selected_slot] = numeric.actor
 			units[slot] = numeric.target
 			rng = numeric.seeds
