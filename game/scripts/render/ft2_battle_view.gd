@@ -30,6 +30,7 @@ var _actor_npc_cache_generation = 0
 var _script: Dictionary = {}
 var _script_commands_seen: Dictionary = {}
 var _script_variant_commands_seen: Dictionary = {}
+var _script_palette_resources_seen: Dictionary = {}
 var _script_unit78: Dictionary = {}
 var _overlay: Array = []
 var _texture: ImageTexture
@@ -347,7 +348,7 @@ func _unit(slot: int) -> Dictionary:
 		return {}
 	return data.decode_unit(battle.units[slot],slot)
 
-func _refresh_actors() -> void:
+func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 	var live: Dictionary = {}
 	var races = data.load_table("race")
 	var items: PackedByteArray = data.raw_table("item")
@@ -406,6 +407,13 @@ func _refresh_actors() -> void:
 		if not dataset.is_empty(): _actor_resource_stems[definition] = stem
 		if game_mode != 4 and actor_resource_load_failures.has("CHAR_%02dV" % definition): actor_resource_load_failures["CHAR_%02dV" % definition]["later_loaded_resource"] = stem
 		var signature = stem+prefix+label+str(flags)
+		var appearance_key = [u.kind,definition,direction,control,u.state,u.move_marker,u.action_marker,u.weapon,u.armor,u.accessory1,u.accessory2]
+		if preserve_mode_handles and _actors.has(slot) and _actors[slot].stem == stem and _actors[slot].get("appearance_key",[]) == appearance_key:
+			# A mode switch does not call419060 or replace any Unit70/74/78.
+			# In particular, it cannot play a default pose into a blank Unit70.
+			live[slot] = _actors[slot]
+			live[slot].signature = signature
+			continue
 		if _actors.has(slot) and _actors[slot].signature == signature:
 			live[slot] = _actors[slot]
 		else:
@@ -419,7 +427,9 @@ func _refresh_actors() -> void:
 				player.play(dataset,prefix+label,clock_ms,flags,true)
 			else:
 				player.visible = false
-			live[slot] = {"player":player,"signature":signature,"stem":stem,"priority":4,"slot":slot}
+			live[slot] = _actors[slot].duplicate() if _actors.has(slot) and _actors[slot].stem == stem else {}
+			live[slot].merge({"player":player,"signature":signature,"stem":stem,"priority":4,"slot":slot},true)
+		live[slot]["appearance_key"] = appearance_key
 		var icon_label = "DEAD" if state == 1 and control == 0 else "POISON" if state == 2 else "SLEEP" if state == 3 else "SILENCE" if state == 6 else "CHARM" if state == 7 else ""
 		if icon_label != "":
 			if not live[slot].has("icon") or live[slot].get("icon_label","") != icon_label:
@@ -497,6 +507,7 @@ func unit_preview(slot: int, pos: Vector2i, fresh_front: bool = false) -> Dictio
 	return {"op":"apd","stem":str(record.stem),"label":player.label,"frame":player.frame,"pos":pos,"mirror":false}
 
 func set_script_state(state: Dictionary) -> void:
+	var mode_changed = game_mode != int(state.get("mode",game_mode))
 	var generation = int(state.get("actor_cache_generation",_actor_cache_generation))
 	var cache_reset = generation != _actor_cache_generation
 	if cache_reset:
@@ -505,6 +516,7 @@ func set_script_state(state: Dictionary) -> void:
 		_actors.clear()
 		_script_commands_seen.clear()
 		_script_variant_commands_seen.clear()
+		_script_palette_resources_seen.clear()
 		_script_unit78.clear()
 	var npc_generation = int(state.get("actor_npc_cache_generation",_actor_npc_cache_generation))
 	if npc_generation != _actor_npc_cache_generation:
@@ -530,6 +542,7 @@ func set_script_state(state: Dictionary) -> void:
 		var id = int(actor.get("id",0))
 		var serial = int(actor.get("command_serial",0))
 		var fields: Array = actor.get("changed_fields",[])
+		_acquire_script_sprite_palette(actor)
 		if actor.has("variant") and "variant" in fields and "stem" in fields:
 			if cache_reset: _script_variant_commands_seen[id] = serial
 			elif serial > int(_script_variant_commands_seen.get(id,-1)):
@@ -576,21 +589,40 @@ func set_script_state(state: Dictionary) -> void:
 		if previous.has(id) and previous[id].signature == signature:
 			record = previous[id]
 		else:
-			var player = FT2APDPlayer.new()
+			# Selecting another animation on the same resource retains the pool bit.
+			var player: FT2APDPlayer = previous[id].player if previous.has(id) and str(previous[id].get("actor",{}).get("stem","")) == str(actor.get("stem","")) else FT2APDPlayer.new()
 			player.play(assets.apd(str(actor.get("stem",""))),str(actor.get("label","")),clock_ms,int(actor.get("flags",1)) | (16 if actor.get("mirror",false) else 0))
 			record = {"player":player,"signature":signature,"notified":false}
 		record["actor"] = actor
-		record.player.visible = bool(actor.get("visible",true)) and record.player.frame >= 0
+		if record.player.frame < 0: record.player.visible = false
 		if actor.has("dither") and not actor.has("dither_kind") and not actor.has("dither_target"): record.player.dither = int(actor.dither)
 		record.player.base_flip = 2 if actor.get("flip_y",false) else 0
 		_script.players[id] = record
 	var visible_mode = game_mode
 	var cache_mode = int(state.get("actor_cache_mode",game_mode))
 	if cache_reset: game_mode = cache_mode
-	if not (cache_mode < 0 and (cache_reset or visible_mode == 9)): _refresh_actors() # Town hide41AB80 remains released until show/next EVENT.
+	if not (cache_mode < 0 and (cache_reset or visible_mode == 9)): _refresh_actors(mode_changed) # Town hide41AB80 remains released until show/next EVENT.
 	game_mode = visible_mode
 	for actor in state.get("sprites",[]): _apply_script_actor_properties(actor)
 	_dirty = true
+
+func _acquire_script_sprite_palette(actor: Dictionary) -> void:
+	if not actor.has("palette_start") or not actor.has("palette_count"): return
+	var stem = str(actor.get("stem",""))
+	var first = int(actor.palette_start)
+	var count = int(actor.palette_count)
+	var key = "%s:%d:%d:%d" % [stem,first,count,int(actor.get("palette_resource_serial",0))]
+	if _script_palette_resources_seen.has(key): return
+	_script_palette_resources_seen[key] = true
+	# 43D1F0 OP13 selects4422C0/4422E0 (remap only) or442290
+	# (208/32 BASE only). 42CA50 gives Z sheets42CAF0 instead of that callback.
+	for sheet in assets.apd(stem).get("sheets",[]):
+		var image = assets.apd_image(str(sheet),[[10,count,first]])
+		if image.is_empty(): continue
+		if assets.is_apd_z_sheet(str(sheet)):
+			palette.install_base(image.palette,208,16)
+		elif first == 208:
+			palette.install_base(image.palette,first,count)
 
 func _empty_script_body(slot: int,actor: Dictionary) -> Dictionary:
 	# 43DAC2..43DB0E replaces Unit70 with 42DB30's allocated, unplayed sprite.
@@ -647,25 +679,39 @@ func _apply_script_actor_properties(actor: Dictionary) -> void:
 	if fresh and actor.has("body_visible") and "body_visible" in fields:
 		player.visible = bool(actor.body_visible) and player.frame >= 0
 	if fresh and actor.has("visible") and "visible" in fields:
-		player.visible = bool(actor.visible) and player.frame >= 0
-		for name in ["shadow","icon"]:
-			if base.has(name): base[name].visible = bool(actor.visible)
-		if _script_unit78.has(id): _script_unit78[id].visible = bool(actor.visible)
-	if base.has("shadow"):
-		if actor.has("shadow_visible"): base.shadow.visible = bool(actor.shadow_visible)
-		elif actor.has("shadow"): base.shadow.visible = bool(actor.shadow)
+		for member in _source_unit_family(id): _set_source_player_visible(member,bool(actor.visible))
+	if fresh and base.has("shadow"):
+		if actor.has("shadow_visible") and "shadow_visible" in fields: _set_source_player_visible(base.shadow,bool(actor.shadow_visible))
+		elif actor.has("shadow") and "shadow" in fields: _set_source_player_visible(base.shadow,bool(actor.shadow))
 
 func set_game_mode(mode: int) -> void:
 	if game_mode != mode:
 		game_mode = mode
 		if battle != null:
-			_refresh_actors()
+			_refresh_actors(true)
 		_dirty = true
 
 func unit_player(slot: int) -> FT2APDPlayer:
 	# Native Unit70 is one persistent pool object across actor-job path steps.
 	if _script.get("players",{}).has(slot): return _script.players[slot].player
 	return _actors[slot].player if _actors.has(slot) else null
+
+func _source_unit_family(slot: int) -> Array:
+	# Unit70 is the effective body; Unit78 is either its replacement overlay
+	# or the base status icon, never both. Independent FX do not own these slots.
+	var base: Dictionary = _actors.get(slot,{})
+	return [unit_player(slot),base.get("shadow"),_script_unit78.get(slot,base.get("icon"))]
+
+func _set_source_player_visible(player: FT2APDPlayer, enabled: bool) -> void:
+	# 42E0B0 leaves an allocated but unplayed (frame-1) pool object untouched.
+	if player != null and player.frame >= 0: player.visible = enabled
+
+func set_source_unit_family_visible(enabled: bool) -> void:
+	# 41AC10 walks exactly50 Unit records and writes valid Unit70/74/78 only.
+	# This is an immediate operation, not a policy inherited by future handles.
+	for slot in range(50):
+		for player in _source_unit_family(slot): _set_source_player_visible(player,enabled)
+	_dirty = true
 
 func script_actor_busy(slot: int, include_overlay: bool = false) -> bool:
 	var player = unit_player(slot)
@@ -917,6 +963,7 @@ func service_script_commands(commands: Array) -> Array:
 				else:
 					_base_image = Image.create_from_data(640,480,false,Image.FORMAT_L8,surface.pixels)
 					_upload_surface();_dirty = false
+			"actor_visibility_all": set_source_unit_family_visible(bool(command.get("enabled",true)))
 			"restore": pass #4186F0 is resident-CPU no-op; never a clear.
 			_:
 				unhandled.append(command)
@@ -1414,6 +1461,8 @@ func _draw_apd(player: FT2APDPlayer, anchor: Vector2i, policy: String = "actor",
 			continue
 		if _frame_override_active:
 			pass
+		elif policy == "script_resource":
+			pass # OP13 acquisition owns BASE; drawing never realizes its palette.
 		elif assets.is_apd_z_sheet(sheet):
 			_install_once(image,208,16)
 		elif remap_override != null:
@@ -1592,7 +1641,12 @@ func _render(present: bool = true, copy_mode: bool = false) -> void:
 		var world: Vector2i = actor.get("world",Vector2i.ZERO)
 		var sort_world: Vector2i = actor.get("sort_world",world)
 		var adjust: Vector2i = record.get("base_adjust",Vector2i.ZERO) if record.get("adjust_camera",camera) == camera else Vector2i.ZERO
-		drawables.append({"player":record.player,"anchor":actor.get("pos",world_to_screen(world))+adjust,"depth":sort_world.x+sort_world.y,"priority":int(record.get("priority",actor.get("priority",4))),"policy":str(actor.get("policy","actor"))})
+		var drawable = {"player":record.player,"anchor":actor.get("pos",world_to_screen(world))+adjust,"depth":sort_world.x+sort_world.y,"priority":int(record.get("priority",actor.get("priority",4))),"policy":str(actor.get("policy","actor"))}
+		if actor.has("palette_start") and actor.has("palette_count"):
+			drawable["policy"] = "script_resource"
+			drawable["remaps"] = [[10,int(actor.palette_count),int(actor.palette_start)]]
+			drawable["palette_install"] = []
+		drawables.append(drawable)
 	if _frame_override_active:
 		drawables = _frame_override
 	# Native42E1B0/42E530 cull BEFORE the unstable exchange sort.
@@ -1611,13 +1665,13 @@ func _render(present: bool = true, copy_mode: bool = false) -> void:
 			_redraw_map(diagonal,0,dirty)
 			for record in drawables:
 				if int(record.depth) == diagonal:
-					var rect = _draw_apd(record.player,record.anchor,record.policy)
+					var rect = _draw_apd(record.player,record.anchor,record.policy,Rect2i(0,0,640,480),record.get("remaps",null),record.get("palette_install",[]))
 					if rect.size != Vector2i.ZERO and dirty.size() < 100:
 						dirty.append({"depth":diagonal,"rect":rect})
 			_redraw_map(diagonal,1,dirty)
 	else:
 		for record in drawables:
-			_draw_apd(record.player,record.anchor,record.policy)
+			_draw_apd(record.player,record.anchor,record.policy,Rect2i(0,0,640,480),record.get("remaps",null),record.get("palette_install",[]))
 	var numbers: Array = []
 	for record in _result_players:
 		if _frame_override_active: break

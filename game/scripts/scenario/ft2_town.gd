@@ -33,6 +33,7 @@ func restore(tail: PackedByteArray) -> void:
 
 func snapshot() -> PackedByteArray:
 	var bytes := PackedByteArray(); bytes.resize(180); bytes.fill(0)
+	bytes.encode_u32(0,180)
 	bytes.encode_u32(4,display_markers & 0xFFFFFFFF)
 	for i in 20:
 		bytes.encode_u32(8+i*4,markers[i]&0xFFFFFFFF); bytes.encode_u32(88+i*4,enabled[i]&0xFFFFFFFF)

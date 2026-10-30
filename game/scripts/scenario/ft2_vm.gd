@@ -94,6 +94,8 @@ var _title_commands: Array[Dictionary] = []
 var _speaker_latches := [0,0]
 var _bitmap_sizes: Dictionary = {}
 var _last_resource_stem := ""
+var _last_script_resource_palette: Dictionary = {}
+var _script_resource_serial := 0
 var context_actor := -1
 var other_actor := -1
 var _modal_followups: Array[Dictionary] = []
@@ -532,10 +534,11 @@ func _execute(op: int, a: Array) -> bool:
 			alternate_surface=true;_surface_fill_index=-1
 		51:
 			palette_requested.emit({"kind":"restore_script_base"})
-			_source_commands([{"op":"restore","targets":["main","backdrop"]}])
+			_source_commands([{"op":"actor_visibility_all","enabled":true},{"op":"restore","targets":["main","backdrop"]}])
 			alternate_surface=false;_surface_fill_index=-1;bitmap = ""; dialogue.clear(); dialogue_halves.clear(); _title_commands.clear()
 		52:
 			palette_requested.emit({"kind":"save_script_base"})
+			_source_commands([{"op":"actor_visibility_all","enabled":false}])
 			alternate_surface=true;mode = 8; scene.start(int(a[0])); scene_requested.emit(int(a[0])); return true
 		53: _battle_reset()
 		54:
@@ -802,9 +805,17 @@ func _create_actor(a: Array, script_sprite: bool) -> void:
 	var slot := int(constructed.slot)
 	battle.units = constructed.units; battle.rng = constructed.seeds
 	if slot < 0: return
-	if script_sprite: _last_resource_stem = str(a[0]).to_upper()
+	var palette_start := 208 if kind >= 4000 else (32 if kind >= 1000 else 144)
+	var palette_count := 32 if kind >= 4000 else (112 if kind >= 1000 else 64)
+	if script_sprite:
+		_last_resource_stem = str(a[0]).to_upper()
+		_script_resource_serial += 1
+		_last_script_resource_palette = {"stem":_last_resource_stem,"start":palette_start,"count":palette_count,"serial":_script_resource_serial}
 	if _last_resource_stem != "":
-		_sprite(slot,{"stem":_last_resource_stem,"visible":true,"priority":5 if kind >= 4000 else 3,"palette_start":208 if kind >= 4000 else (32 if kind >= 1000 else 144),"palette_count":32 if kind >= 4000 else (112 if kind >= 1000 else 64)})
+		# OP14 reuses44C388: the acquired resource keeps its callback/remap even
+		# when the new temporary Unit kind selects a different drawing priority.
+		var resource := _last_script_resource_palette if str(_last_script_resource_palette.get("stem","")) == _last_resource_stem else {}
+		_sprite(slot,{"stem":_last_resource_stem,"visible":true,"priority":5 if kind >= 4000 else 3,"palette_start":int(resource.get("start",palette_start)),"palette_count":int(resource.get("count",palette_count)),"palette_resource_serial":int(resource.get("serial",0))})
 
 func _job_metadata(slot:int)->Dictionary:
 	var metadata:Dictionary=actor_sprites.get(slot,{}).duplicate(true)
