@@ -24,6 +24,7 @@ var _cells: Dictionary = {}
 var _baked: Dictionary = {}
 var _actors: Dictionary = {}
 var _actor_resource_stems: Dictionary = {} #45EAD0 definition resource cache.
+var _actor_palette_acquired: Dictionary = {}
 var actor_resource_load_failures: Dictionary = {} # Original optional V load returned NULL.
 var _actor_cache_generation = 0
 var _actor_npc_cache_generation = 0
@@ -47,6 +48,7 @@ var _camera_motion: Dictionary = {}
 var _dirty = true
 var _hover = Vector2i(-1,-1)
 var _installed: Dictionary = {}
+var _experience_palette_snapshot: Dictionary = {}
 var _script_saved_base: PackedByteArray = PackedByteArray() #4621D0, normalized RGB.
 var environment
 var physical
@@ -453,6 +455,7 @@ func _build_actor_records(preserve_mode_handles: bool = false, only_slot: int = 
 			actor_resource_load_failures[stem] = {"return_handle":0,"mode":appearance_mode,"definition":definition,"slot":slot,"source":"42C460 resource load failure before Unit70 release","substitute_loaded":false}
 			if _actors.has(slot): live[slot] = _actors[slot]
 			continue
+		_acquire_actor_resource_palette(definition,stem,dataset)
 		_actor_resource_stems[definition] = stem
 		if appearance_mode != 4 and actor_resource_load_failures.has("CHAR_%02dV" % definition): actor_resource_load_failures["CHAR_%02dV" % definition]["later_loaded_resource"] = stem
 		var signature = stem+prefix+label+str(flags)
@@ -573,6 +576,7 @@ func set_script_state(state: Dictionary) -> void:
 	if cache_reset:
 		_actor_cache_generation = generation
 		_actor_resource_stems.clear()
+		_actor_palette_acquired.clear()
 		_actors.clear()
 		_script_commands_seen.clear()
 		_script_variant_commands_seen.clear()
@@ -585,7 +589,8 @@ func set_script_state(state: Dictionary) -> void:
 	if npc_generation != _actor_npc_cache_generation:
 		_actor_npc_cache_generation = npc_generation
 		for definition in _actor_resource_stems.keys():
-			if int(definition) >= 10: _actor_resource_stems.erase(definition)
+			if int(definition) >= 10:
+				_actor_resource_stems.erase(definition); _actor_palette_acquired.erase(definition)
 		for slot in _actors.keys():
 			if int(slot) >= 10: _actors.erase(slot)
 		for slot in _script_unit78.keys():
@@ -625,6 +630,7 @@ func set_script_state(state: Dictionary) -> void:
 					var definition = int(unit.definition_id)
 					var stem = "CHAR_%02d%s" % [definition,str(actor.variant).to_upper()]
 					_actor_resource_stems.erase(definition)
+					_actor_palette_acquired.erase(definition)
 					if assets.manifest.get("apds",{}).has(stem):
 						_actor_resource_stems[definition] = stem
 						_refresh_actor(id)
@@ -679,6 +685,10 @@ func set_script_state(state: Dictionary) -> void:
 	var cache_mode = int(state.get("actor_cache_mode",game_mode))
 	if cache_reset: game_mode = cache_mode
 	if not (cache_mode < 0 and (cache_reset or visible_mode == 9)): _refresh_actors(mode_changed) # Town hide41AB80 remains released until show/next EVENT.
+	if cache_reset and cache_mode >= 0:
+		#43E671..6A8 OP48 reconstructs under MODE1, then only changes the global
+		#mode back to EVENT4. The existing pool objects keep their MODE1 appearance.
+		for slot in _actors: _source_appearance_modes[int(slot)] = cache_mode
 	game_mode = visible_mode
 	for actor in state.get("sprites",[]): _apply_script_actor_properties(actor)
 	_dirty = true
@@ -700,6 +710,18 @@ func _acquire_script_sprite_palette(actor: Dictionary) -> void:
 			palette.install_base(image.palette,208,16)
 		elif first == 208:
 			palette.install_base(image.palette,first,count)
+
+func _acquire_actor_resource_palette(definition: int,stem: String,dataset: Dictionary) -> void:
+	if str(_actor_palette_acquired.get(definition,"")) == stem: return
+	# 4196C0 is the resource callback: remap10/64 to144, then417D50 BASE only.
+	# CPU image caching does not suppress a fresh native resource acquisition.
+	for sheet in dataset.get("sheets",[]):
+		var image = assets.apd_image(str(sheet),[[10,64,144]])
+		if image.is_empty(): continue
+		var band = assets.apd_palette_band(str(sheet),144,64)
+		palette.install_base(image.palette,band.x,band.y)
+		_mark_palette_loaded(image,band.x,band.y)
+	_actor_palette_acquired[definition] = stem
 
 func _empty_script_body(slot: int,actor: Dictionary) -> Dictionary:
 	# 43DAC2..43DB0E replaces Unit70 with 42DB30's allocated, unplayed sprite.
@@ -974,12 +996,28 @@ func palette_request(request: Dictionary) -> void:
 			elif transform == "whiten":
 				r = int((r+255)/2); g = int((g+255)/2); b = int((b+255)/2)
 			target[p] = r; target[p+1] = g; target[p+2] = b
-		if transform == "whiten":
-			palette.install(target,tint_first,tint_count)
+		# SYS53/54 whiten a local417E70 snapshot;4180D0 realizes CURRENT, never BASE.
 		palette.fade(target,first,count,interval,clock_ms)
 	else:
 		unsupported["palette:"+kind+str(request.get("selector",""))] = request
 	_dirty = true
+
+func set_experience_palette_scope(begin: bool) -> void:
+	# Native Dialog162 paints WALL through its GDI bitmap, independently of the
+	# game's DirectDraw palette. Our indexed adapter temporarily borrows colors;
+	# none of those UI acquisitions may persist into the caller's game rendering.
+	if begin:
+		if not _experience_palette_snapshot.is_empty(): return
+		for key in ["base","current","_fade_from","_fade_to","_start","_count","_interval","_epoch","fading","progress"]:
+			var value = palette.get(key)
+			_experience_palette_snapshot[key] = value.duplicate() if value is PackedByteArray else value
+		_experience_palette_snapshot["installed"] = _installed.duplicate()
+	elif not _experience_palette_snapshot.is_empty():
+		for key in _experience_palette_snapshot:
+			if key != "installed": palette.set(key,_experience_palette_snapshot[key])
+		_installed = _experience_palette_snapshot.installed.duplicate()
+		_experience_palette_snapshot.clear()
+		palette.dirty = true; _dirty = true
 
 func source_surface_fill(color: int, present: bool = true) -> void:
 	# SYS24/30 directly write44A288 then4189A0; this is a one-shot surface operation.
@@ -2039,6 +2077,7 @@ static func _disconnect_owned_signals(object) -> void:
 				object.disconnect(signal_name,connection.callable)
 
 func dispose() -> void:
+	set_experience_palette_scope(false)
 	if _disposed:
 		return
 	_disposed = true

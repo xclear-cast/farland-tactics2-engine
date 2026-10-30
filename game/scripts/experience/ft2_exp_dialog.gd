@@ -2,6 +2,7 @@ class_name FT2ExpDialog
 extends RefCounted
 ## 440730 Dialog162. Growth belongs to the caller after this dialog returns.
 signal finished(accepted: bool, allocations: Array)
+signal palette_scope_requested(begin: bool)
 signal cursor_refresh_requested(point: Vector2i)
 signal invalidated(controls: Array)
 signal unsupported(details: Dictionary)
@@ -108,6 +109,7 @@ func open(amount: int) -> bool:
 	if count == 0 and pool > 0:
 		unsupported.emit({"kind":"source_positive_pool_zero_party_division","pool":pool})
 		return false
+	palette_scope_requested.emit(true)
 	active = true
 	message(0x111,1109) # Source synchronous default balance reentry.
 	return true
@@ -131,6 +133,7 @@ func message(msg: int,wparam: int = 0,lparam: int = 0) -> int:
 		if last_command == 1:
 			for i in range(count): battle.rules.put16(battle.units[i],44,battle.units[i].decode_u16(44)+(int(allocations[i])&65535))
 			active = false
+			palette_scope_requested.emit(false)
 			battle.changed.emit()
 			finished.emit(true,allocations.duplicate())
 			return 1

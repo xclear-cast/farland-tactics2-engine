@@ -102,6 +102,7 @@ func _ready() -> void:
 	view = View.new(); add_child(view); view.configure(data); view.set_battle(battle)
 	vm = Scenario.new(data,battle)
 	ui = Interface.new(); ui.configure(data,battle,vm)
+	ui.experience.palette_scope_requested.connect(view.set_experience_palette_scope)
 	exit_request=ExitRequest.new();exit_request.configure(data,battle,vm)
 	exit_request.accepted.connect(_quit_game)
 	exit_request.cancelled.connect(_restore_after_close_request)
@@ -918,7 +919,7 @@ func _release_runtime() -> void:
 	cursor_host.dispose()
 	view.dispose()
 	# RefCounted controllers subscribe to each other's signals; release those cycles explicitly.
-	for controller in [battle,vm,ui,vm.scene,vm.town,startup,exit_request,launch_options,display_profile]:
+	for controller in [battle,vm,ui,ui.experience,vm.scene,vm.town,startup,exit_request,launch_options,display_profile]:
 		for declaration in controller.get_signal_list():
 			for connection in controller.get_signal_connection_list(str(declaration.name)):
 				controller.disconnect(str(declaration.name),connection.callable)
