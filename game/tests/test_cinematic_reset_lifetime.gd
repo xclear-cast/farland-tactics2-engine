@@ -93,7 +93,7 @@ func test_cue_lifetime() -> void:
 	apply(scene,m,"layer_crop",[1,0,0,0,0,0,2,2]);apply(scene,m,"layer_transparent_index",[1,253]);apply(scene,m,"layer_aux_offset",[1,8,9])
 	m.layers[1].mask=123;m.layers[1].mask_rect=Rect2i(1,2,3,4);m.layers[1].visible=false
 	var layer: Dictionary=m.layers[1].duplicate(true);layer.offset=Vector2i.ZERO
-	m.order=[1,9,0];m.clip=Rect2i(3,4,100,80);m.dithers[1]={"own":"config"};m.credits={"own":"text"};m.selected_layer=1
+	m.order=[1,9,0];m.clip=Rect2i(3,4,100,80);m.dithers[1]={"own":"config"};m.credits={"own":"text","entries":[],"y":0};m.selected_layer=1
 	m.queues[1]={"own":true};m.motions[1]={"own":true};m.apd_resources[0]={"own":true};m.apd_instances[0]={"own":true};m.callbacks[1]={"own":true};m.wave_slots[3]="own-wave"
 	m.bitmaps[99]={"stem":"OWN_A","remaps":[]};scene.now=333
 	apply(scene,m,"release_cue_reset_scene",[10])
@@ -102,7 +102,7 @@ func test_cue_lifetime() -> void:
 	check(not m.cue_states.has(2) and not m.cue_states.has(4),"release skips NO_ENTRY and other profile records")
 	check(m.layers[1]==layer,"cue release preserves drawable/key/visibility/dither geometry and resets only auxiliary offset")
 	check(m.order==[1,9,0] and m.clip==Rect2i(3,4,100,80) and m.selected_layer==1,"cue release preserves draw order, clip and selected layer")
-	check(m.dithers=={1:{"own":"config"}} and m.credits=={"own":"text"},"cue release does not erase dither configuration or text state")
+	check(m.dithers=={1:{"own":"config"}} and m.credits=={"own":"text","entries":[],"y":0},"cue release does not erase dither configuration or text state")
 	check(m.queues.is_empty() and m.motions.is_empty() and m.apd_resources.is_empty() and m.apd_instances.is_empty() and m.callbacks.is_empty(),"cue release clears exactly the shared temporary resource domains")
 	check(m.local_epoch==77 and m.global_epoch==88 and m.last_released_waves==["own-wave"],"cue release preserves epochs and reports released wave slots")
 	check(scene.commands().is_empty(),"released bitmap slots cannot emit stale bitmap commands despite preserved crop fields")

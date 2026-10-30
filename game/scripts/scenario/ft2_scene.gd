@@ -41,7 +41,7 @@ func start(value: int) -> bool:
 	if value < 0 or value >= _bindings.size(): return false
 	selector = value; profile = int(_bindings[value].state_selector_word); phase = int(_bindings[value].second_parameter_word)
 	local_state = 0; aux = 0; _pending_finish = false; _lifecycle = 0
-	_model = {"local_epoch":now,"global_epoch":now,"palette_until":now,"layers":{},"queues":{},"bitmaps":{},"motions":{},"dithers":{},"photos":{},"scalars":{},"order":[],"clip":Rect2i(0,0,640,480),"wave_slots":{},"bands":{},"apd_resources":{},"apd_instances":{},"credits":{},"callbacks":{},"rng":battle.rng.duplicate() if battle != null else [167,19960,5150]}
+	_model = {"local_epoch":now,"global_epoch":now,"palette_until":now,"layers":{},"queues":{},"bitmaps":{},"motions":{},"dithers":{},"photos":{},"scalars":{},"order":[],"clip":Rect2i(0,0,640,480),"wave_slots":{},"bands":{},"apd_resources":{},"apd_instances":{},"credits":{},"selected_layer":-1,"callbacks":{},"rng":battle.rng.duplicate() if battle != null else [167,19960,5150]}
 	_pending_edge.clear(); _players.clear()
 	busy = _load_graph()
 	return busy
@@ -379,7 +379,7 @@ func _advance_backend(m: Dictionary) -> void:
 			player.play(data.load_apd(str(resource.stem)),str(instance.label),int(instance.epoch),int(instance.flags))
 			cached = {"identity":identity,"player":player}; _players[id] = cached
 		cached.player.advance(now)
-	if not m.credits.is_empty() and m.credits.active:
+	if int(m.get("selected_layer",-1)) != -1 and not m.credits.is_empty() and m.credits.active:
 		var credits: Dictionary = m.credits
 		var elapsed := _s32(now-int(credits.epoch)); var duration := int(credits.duration)
 		if duration <= 0 or elapsed >= duration: credits.y = 480-int(credits.total_height)-480; credits.active = false
@@ -409,7 +409,12 @@ func commands() -> Array[Dictionary]:
 		var id := int(id_value)
 		#42A380 dispatches registered APDs at layer9's place in draw order.
 		if id == 9:
-			if not _model.layers.has(id) or _model.layers[id].visible: out.append_array(_apd_commands())
+			#42A380/42A5A0 dispatch the independent APD pool before layer flags.
+			out.append_array(_apd_commands())
+			continue
+		if id == int(_model.get("selected_layer",-1)):
+			#42A430 replaces this layer's bitmap/callback, regardless of visibility.
+			out.append_array(_credits_commands(id))
 			continue
 		if not _model.layers.has(id): continue
 		var layer: Dictionary = _model.layers[id]
@@ -431,9 +436,17 @@ func commands() -> Array[Dictionary]:
 			if int(layer.mask) != 0 and int(layer.mask) != 65535 and layer.has("mask_rect"):
 				pos = Rect2i(layer.mask_rect).position+Vector2i(layer.offset)
 			out.append({"op":"bitmap","key":"BMP/"+str(bitmap.stem)+".BMP","pos":pos,"source":layer.source,"transparent":int(layer.key),"dither":int(layer.mask),"raw_dither":true,"remaps":bitmap.remaps,"clip":_model.clip})
-		if not _model.credits.is_empty() and int(_model.credits.layer) == id:
-			for entry in _model.credits.entries:
-				var command: Dictionary = entry.duplicate(true); command.pos = Vector2i(command.pos)+Vector2i(0,int(_model.credits.y)); out.append(command)
+	return out
+
+func _credits_commands(layer_id: int) -> Array[Dictionary]:
+	var out: Array[Dictionary] = []
+	if _model.credits.is_empty(): return out
+	var offset: Vector2i = _layer(_model,layer_id).offset
+	for entry in _model.credits.entries:
+		var command: Dictionary = entry.duplicate(true)
+		command.pos = Vector2i(command.pos)+offset+Vector2i(0,int(_model.credits.y))
+		command["clip"] = _model.clip
+		out.append(command)
 	return out
 
 func _apd_commands() -> Array[Dictionary]:
@@ -457,6 +470,7 @@ func _apd_commands() -> Array[Dictionary]:
 	return out
 
 func _start_credits(m: Dictionary, layer: int, duration: int) -> void:
+	m["selected_layer"] = layer #429B60 selects it before loading the text group.
 	_layer(m,layer)
 	var source: Dictionary = data.read_json("data/port_ready/scripts/credits/DATA/STAFF.json")
 	var entries: Array = []

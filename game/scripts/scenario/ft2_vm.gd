@@ -608,7 +608,7 @@ func _system(op: int, a: Array) -> bool:
 		12:
 			for i in range(10,mini(50,battle.units.size())):
 				var kind := _read(i,0)
-				if (kind == 8 or kind == 24 or kind > 30) and (_read(i,38) == 0 or _read(i,16) == 1): _remove_actor(i)
+				if (kind == 8 or kind == 24 or kind > 30) and (_read(i,38) == 0 or _read(i,16) != 1): _remove_actor(i)
 		13,14: _sprite(slot,{"dither_interval":int(a[1]),"dither_target":8 if op == 13 else 0})
 		15:
 			if _read(slot,16) == 9 and _read(slot,18) != 1 and int(a[1]) != 0: _write(slot,16,0)

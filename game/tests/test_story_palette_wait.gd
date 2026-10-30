@@ -22,7 +22,7 @@ func fixture() -> Dictionary:
 	var view=View.new();view.assets=OwnAssets.new();view.palette=FT2Palette.new();view.surface=FT2IndexedSurface.new();view.clock_ms=100
 	var vm=VM.new();vm.now_ms=100;vm.mode=4;vm._bitmap_sizes["BMP/OWN.BMP"]=Vector2i(2,1)
 	vm.palette_requested.connect(view.palette_request)
-	vm.palette_busy_query=func() -> bool:return view.palette.fading
+	vm.palette_busy_query=func() -> bool:return view.palette.progress != 128
 	return {"view":view,"vm":vm}
 
 func step(f: Dictionary,time: int) -> void:

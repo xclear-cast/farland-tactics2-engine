@@ -130,11 +130,26 @@ func configure(source_data) -> void:
 	add_child(_sprite)
 	var system = assets.image("sprite/system.bmp", [[90,16,208],[10,64,144],[74,16,16]])
 	if not system.is_empty():
-		palette.install(system.palette)
-		_cycle_palette = system.palette.slice(208*3,224*3)
+		_acquire_system_palette(system)
+		_initialize_frontend_palette(system)
 	_cursor = FT2APDPlayer.new()
 	_cursor.play(assets.apd("SYSTEM"),"CURSOR",clock_ms,3)
 	_dirty = true
+
+func _acquire_system_palette(image: Dictionary) -> void:
+	# 41AC40 loads SYSTEM through41ADB0 before any Unit resources. The callback
+	# copies shared144/64 and UI16/16 to BASE only;208/16 is a cycle table.
+	for band in [Vector2i(144,64),Vector2i(16,16)]:
+		palette.install_base(image.palette,band.x,band.y)
+		_mark_palette_loaded(image,band.x,band.y)
+	_cycle_palette = image.palette.slice(208*3,224*3)
+
+func _initialize_frontend_palette(image: Dictionary) -> void:
+	# Our indexed Win95-dialog adapter uses reserved GDI colors and UI16..31.
+	# TITLE/WHAT own their explicit bitmap bands. Never bootstrap actor144..207
+	# here: the original SYSTEM callback does not realize that shared game band.
+	palette.install(image.palette,0,32)
+	palette.install(image.palette,246,10)
 
 func set_battle(model) -> void:
 	battle = model
