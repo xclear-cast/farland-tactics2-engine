@@ -133,6 +133,7 @@ func _ready() -> void:
 	battle.frame_service_callback = _nested_frame_service
 	vm.measure_text = Callable(view,"measure_text")
 	vm.actor_player_query = Callable(view,"unit_player")
+	vm.actor_appearance_refresh = Callable(self,"_source_appearance_refresh")
 	vm.actor_busy_query = Callable(view,"script_actor_busy")
 	vm.palette_busy_query = func() -> bool: return view.palette.progress != 128
 	vm.actor_restore_requested.connect(view.restore_script_actor)
@@ -412,6 +413,9 @@ func _interaction_requested(operation: String,request: Dictionary) -> void:
 			ui.service_unit_window_visibility(bool(request.get("enabled",true)))
 		"event_gate": overview.show_previous_visibility(bool(request.get("enabled",true)))
 		_: errors.append({"interaction_operation":operation,"request":request})
+
+func _source_appearance_refresh(slot: int, release_first: bool = false) -> Dictionary:
+	return view.source_refresh_actor(slot,release_first,int(vm.mode))
 
 func _script_state(state: Dictionary) -> void:
 	if view.has_method("set_script_state"): view.set_script_state(state)
@@ -920,6 +924,7 @@ func _release_runtime() -> void:
 				controller.disconnect(str(declaration.name),connection.callable)
 	vm.measure_text = Callable()
 	vm.actor_player_query = Callable()
+	vm.actor_appearance_refresh = Callable()
 	vm.actor_busy_query = Callable()
 	vm.music_busy_query = Callable()
 	vm.palette_busy_query = Callable()

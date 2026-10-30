@@ -55,6 +55,7 @@ var active_window := true
 var actor_busy: Dictionary = {}
 var actor_busy_query:Callable
 var actor_player_query:Callable
+var actor_appearance_refresh:Callable # View reports successful source4196F0 before display metadata is handed off.
 var actor_sprites: Dictionary = {}
 var actor_cache_generation:=0
 var actor_cache_mode:=1
@@ -458,8 +459,12 @@ func _execute(op: int, a: Array) -> bool:
 				if actor_player_query.is_valid():kept["player_override"]=actor_player_query.call(slot)
 				kept["world"]=_cell(slot);kept["externally_advanced"]=false
 				actor_sprites[slot]=kept #419060 leaves definition7 Unit70 resource and last frame untouched.
-			else:actor_sprites.erase(slot)
-			jobs.clear(slot);actor_busy.erase(slot);_emit_actor_state();actor_restore_requested.emit(slot)
+			jobs.clear(slot); actor_busy.erase(slot)
+			if actor_appearance_refresh.is_valid():
+				if not _request_source_appearance(slot): _emit_actor_state()
+			else:
+				if _read(slot,2) != 7: actor_sprites.erase(slot)
+				_emit_actor_state(); actor_restore_requested.emit(slot)
 		18:
 			camera_busy = int(a[4]) > 0
 			camera_requested.emit({"kind":"motion","dx":int(a[0]),"dy":int(a[1]),"target":Vector2i(int(a[2]),int(a[3])),"interval":int(a[4])})
@@ -492,6 +497,7 @@ func _execute(op: int, a: Array) -> bool:
 			for slot in range(10, mini(50, battle.units.size())): _remove_actor(slot)
 		31:
 			if int(a[1]) != 4: _write(int(a[0]), 6, int(a[1]))
+			_request_source_appearance(int(a[0]))
 		32: _jump(str(a[0]))
 		33: _sprite(int(a[0]), {"reset_body":true,"label":"","shadow_visible":false})
 		34:
@@ -509,6 +515,7 @@ func _execute(op: int, a: Array) -> bool:
 		37:
 			var p := _cell(int(a[0])); var q := _cell(int(a[1]))
 			_write(int(a[1]), 6, _facing(p - q))
+			_request_source_appearance(int(a[1]))
 		38: _sprite(int(a[0]), {"pos":Vector2i(int(a[1]),int(a[2]))})
 		39:
 			if (int(a[0]) != 0) == equal_flag: _jump(str(a[1]))
@@ -573,10 +580,15 @@ func _system(op: int, a: Array) -> bool:
 			for i in range(10,mini(50,battle.units.size())):
 				if _read(i,18) == 1: _remove_actor(i)
 		2: _sprite(slot,{"source_shadow_handle":int(a[1]) != 0})
-		3: _write(slot,92,int(a[1]),4); _write(slot,96,int(a[1]),4)
+		3:
+			_write(slot,92,int(a[1]),4); _write(slot,96,int(a[1]),4)
+			_request_source_appearance(slot)
 		4: town.set_flag(int(a[0]),int(a[1]))
 		5:
-			for i in mini(10,battle.units.size()): _sprite(i,{"visible":i == slot})
+			for i in mini(10,battle.units.size()):
+				if _read(i,0) == 0: continue
+				if i == slot: _request_source_appearance(i)
+				else: _sprite(i,{"visible":false})
 		6: current_event = _var(int(a[0])); current_day = current_event
 		7,22,24,25,29,30,38,45,49:
 			var interval := int(a[0]) if not a.is_empty() else 0
@@ -611,15 +623,21 @@ func _system(op: int, a: Array) -> bool:
 				if (kind == 8 or kind == 24 or kind > 30) and (_read(i,38) == 0 or _read(i,16) != 1): _remove_actor(i)
 		13,14: _sprite(slot,{"dither_interval":int(a[1]),"dither_target":8 if op == 13 else 0})
 		15:
-			if _read(slot,16) == 9 and _read(slot,18) != 1 and int(a[1]) != 0: _write(slot,16,0)
+			if _read(slot,16) == 9 and _read(slot,18) != 1 and int(a[1]) != 0:
+				_write(slot,16,0); _request_source_appearance(slot)
 			_sprite(slot,{"visible":int(a[1]) != 0})
 		16:
 			for i in mini(10,battle.units.size()):
-				if i != slot and _read(i,0) != 0: _write(i,6,_facing(_cell(slot)-_cell(i)))
-		17: _write(slot,0,8); _write(slot,38,0); _write(slot,16,1)
+				if i != slot and _read(i,0) != 0:
+					_write(i,6,_facing(_cell(slot)-_cell(i))); _request_source_appearance(i)
+		17:
+			_write(slot,0,8); _write(slot,38,0); _write(slot,16,1)
+			_request_source_appearance(slot)
 		18:
 			for i in battle.units.size():
-				if _read(i,16) == 9 and int(a[0]) != 0: _write(i,16,0)
+				if _read(i,0) == 0: continue
+				if _read(i,16) == 9 and int(a[0]) != 0:
+					_write(i,16,0); _request_source_appearance(i)
 				_sprite(i,{"visible":int(a[0]) != 0})
 		19:
 			_modal_surface_commands.assign([{"op":"clear_rect","surface":"main","rect":Rect2i(0,0,640,480),"color":0},{"op":"present","mode":"main"}])
@@ -640,7 +658,8 @@ func _system(op: int, a: Array) -> bool:
 			for kind in [1,2]:
 				var found := _actor(kind)
 				if found >= 0 and not _read(found,16) in [1,3,4,5,8,9]: equal_flag = true
-		36: _write(slot,16,8)
+		36:
+			_write(slot,16,8); _request_source_appearance(slot)
 		37:
 			equal_flag = battle.grant_item(slot,int(a[1]),1)
 			var items: Array = data.load_table("item")
@@ -653,6 +672,7 @@ func _system(op: int, a: Array) -> bool:
 		41: _morph_context()
 		42:
 			_write(context_actor,2,64)
+			_request_source_appearance(context_actor,true)
 		43:
 			_write(slot,38,0); _write(slot,42,0); _write(slot,16,1)
 			previous_mode = 1 #4400DE..4400F8: release/rebuild this Unit in mode1, then resume EVENT4.
@@ -828,6 +848,32 @@ func _create_actor(a: Array, script_sprite: bool) -> void:
 		var resource := _last_script_resource_palette if str(_last_script_resource_palette.get("stem","")) == _last_resource_stem else {}
 		_sprite(slot,{"stem":_last_resource_stem,"visible":true,"priority":5 if kind >= 4000 else 3,"palette_start":int(resource.get("start",palette_start)),"palette_count":int(resource.get("count",palette_count)),"palette_resource_serial":int(resource.get("serial",0))})
 
+func _request_source_appearance(slot: int, release_first: bool = false) -> bool:
+	if slot < 0 or slot >= battle.units.size() or _read(slot,0) == 0: return false
+	if not actor_appearance_refresh.is_valid():
+		actor_restore_requested.emit(slot) # Legacy diagnostic adapters cannot report source success.
+		return false
+	var result = actor_appearance_refresh.call(slot,release_first)
+	if not result is Dictionary: return false
+	var player = result.get("player")
+	if not result.get("rebuilt",false) and not result.get("released",false):
+		# Native definition7/load-failure exits keep the actual Unit70 playback.
+		# Preserve command metadata too; bind its current player against stale job snapshots.
+		if player != null:
+			var kept: Dictionary = actor_sprites.get(slot,{"id":slot}).duplicate(true)
+			kept["player_override"] = player; kept["source_unit70_owner"] = true
+			actor_sprites[slot] = kept
+		return false
+	var serial := int(actor_sprites.get(slot,{}).get("command_serial",0))
+	var state := {"id":slot,"command_serial":serial,"changed_fields":[],"world":_cell(slot),"source_unit70_owner":true,"priority":int(result.get("priority",4))}
+	if player != null:
+		state["player_override"] = player; state["stem"] = str(result.get("stem",""))
+	else: state["source_body_missing"] = true
+	actor_sprites[slot] = state
+	if jobs != null and not jobs.is_busy(slot): jobs.clear(slot); actor_busy.erase(slot)
+	_emit_actor_state()
+	return bool(result.get("rebuilt",false))
+
 func _job_metadata(slot:int)->Dictionary:
 	var metadata:Dictionary=actor_sprites.get(slot,{}).duplicate(true)
 	if actor_player_query.is_valid():metadata["player_override"]=actor_player_query.call(slot)
@@ -839,6 +885,8 @@ func _set_complete_flag(value:int)->void:
 func _sprite(slot: int, changes: Dictionary) -> void:
 	if slot < 0: return
 	var state: Dictionary = actor_sprites.get(slot,{"id":slot,"visible":true,"label":"","world":_cell(slot)})
+	if changes.has("stem") or changes.get("reset_body",false):
+		state.erase("source_unit70_owner"); state.erase("source_body_missing")
 	if changes.get("play",false) or changes.has("stem") or changes.get("reset_body",false):
 		state.erase("player_override")
 		if jobs!=null and not jobs.is_busy(slot):jobs.clear(slot) # Replacing Unit70 invalidates a completed job's old visual alias.
@@ -874,6 +922,11 @@ func _emit_actor_state() -> void:
 	if jobs != null:
 		for snapshot in jobs.snapshots():
 			var state: Dictionary = actor_sprites.get(int(snapshot.id),snapshot.metadata).duplicate(true)
+			if state.get("source_unit70_owner",false) and actor_player_query.is_valid():
+				snapshot = snapshot.duplicate()
+				var current = actor_player_query.call(int(snapshot.id))
+				if current != null: snapshot["player_override"] = current; snapshot["source_body_missing"] = false
+				else: snapshot.erase("player_override"); snapshot["source_body_missing"] = true
 			state.merge(snapshot,true); states[int(snapshot.id)] = state
 	actor_changed.emit({"mode":mode,"sprites":states.values(),"actor_cache_generation":actor_cache_generation,"actor_cache_mode":actor_cache_mode,"actor_npc_cache_generation":actor_npc_cache_generation})
 

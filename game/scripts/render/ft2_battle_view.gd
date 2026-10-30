@@ -34,6 +34,7 @@ var _script_palette_resources_seen: Dictionary = {}
 var _script_unit78: Dictionary = {}
 var _script_unit74: Dictionary = {} # Explicit SYS2 Unit74 handles; NULL means released, not hidden.
 var _source_appearance_modes: Dictionary = {} # Mode owned by a specific source4196F0 rebuild.
+var _source_refresh_holds: Dictionary = {} # Failed source refresh preserves existing handles until another real call.
 var _overlay: Array = []
 var _texture: ImageTexture
 var _sprite: Sprite2D
@@ -322,6 +323,7 @@ func remove_actor_visual(slot: int) -> void:
 	_script_unit78.erase(slot)
 	_script_unit74.erase(slot)
 	_source_appearance_modes.erase(slot)
+	_source_refresh_holds.erase(slot)
 	_dirty = true
 
 func sync_actor_visuals() -> void:
@@ -369,15 +371,32 @@ func _unit(slot: int) -> Dictionary:
 		return {}
 	return data.decode_unit(battle.units[slot],slot)
 
+func _mode_handle_key(appearance: Array) -> Array:
+	# Enemy action preparation changes move/action markers without4196F0.
+	# Only a real rebuild consumes them to select the inactive defaultpose.
+	return appearance.slice(0,5)+appearance.slice(7) if appearance.size() >= 7 else appearance
+
 func _refresh_actors(preserve_mode_handles: bool = false) -> void:
-	var live: Dictionary = {}
+	_build_actor_records(preserve_mode_handles)
+
+func _build_actor_records(preserve_mode_handles: bool = false, only_slot: int = -1) -> void:
+	var live: Dictionary = _actors.duplicate() if only_slot >= 0 else {}
 	for slot in _script_unit74.keys():
+		if only_slot >= 0 and int(slot) != only_slot: continue
 		if int(_unit(int(slot)).get("kind",0)) == 0: _script_unit74.erase(slot)
 	for slot in _source_appearance_modes.keys():
+		if only_slot >= 0 and int(slot) != only_slot: continue
 		if int(_unit(int(slot)).get("kind",0)) == 0: _source_appearance_modes.erase(slot)
+	for slot in _source_refresh_holds.keys():
+		if only_slot >= 0 and int(slot) != only_slot: continue
+		if int(_unit(int(slot)).get("kind",0)) == 0: _source_refresh_holds.erase(slot)
 	var races = data.load_table("race")
 	var items: PackedByteArray = data.raw_table("item")
 	for slot in range(battle.units.size()):
+		if only_slot >= 0 and slot != only_slot: continue
+		if _source_refresh_holds.has(slot):
+			if _actors.has(slot): live[slot] = _actors[slot]
+			continue
 		if _magic_deferred_targets.has(slot) and _actors.has(slot):
 			live[slot]=_actors[slot];continue
 		var u = _unit(slot)
@@ -430,15 +449,23 @@ func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 			if _actors.has(slot): live[slot] = _actors[slot] # NULL returns before releasing an existing Unit70/74/78.
 			continue
 		var dataset = assets.apd(stem)
-		if not dataset.is_empty(): _actor_resource_stems[definition] = stem
+		if not _actor_dataset_ready(dataset):
+			actor_resource_load_failures[stem] = {"return_handle":0,"mode":appearance_mode,"definition":definition,"slot":slot,"source":"42C460 resource load failure before Unit70 release","substitute_loaded":false}
+			if _actors.has(slot): live[slot] = _actors[slot]
+			continue
+		_actor_resource_stems[definition] = stem
 		if appearance_mode != 4 and actor_resource_load_failures.has("CHAR_%02dV" % definition): actor_resource_load_failures["CHAR_%02dV" % definition]["later_loaded_resource"] = stem
 		var signature = stem+prefix+label+str(flags)
 		var appearance_key = [u.kind,definition,direction,control,u.state,u.move_marker,u.action_marker,u.weapon,u.armor,u.accessory1,u.accessory2]
-		if preserve_mode_handles and _actors.has(slot) and _actors[slot].stem == stem and _actors[slot].get("appearance_key",[]) == appearance_key:
-			# A mode switch does not call419060 or replace any Unit70/74/78.
+		var previous_key: Array = _actors.get(slot,{}).get("appearance_key",[])
+		var same_structure = _mode_handle_key(previous_key) == _mode_handle_key(appearance_key)
+		var markers_only = same_structure and previous_key != appearance_key
+		if _actors.has(slot) and _actors[slot].stem == stem and same_structure and (preserve_mode_handles or markers_only):
+			# Mode switches/action preparation do not call419060 or replace Unit70/74/78.
 			# In particular, it cannot play a default pose into a blank Unit70.
 			live[slot] = _actors[slot]
 			live[slot].signature = signature
+			live[slot]["appearance_key"] = appearance_key
 			continue
 		if _actors.has(slot) and _actors[slot].signature == signature:
 			live[slot] = _actors[slot]
@@ -451,6 +478,7 @@ func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 					_install_once(image,band.x,band.y)
 			if label != "":
 				player.play(dataset,prefix+label,clock_ms,flags,true)
+				if player.frame < 0: player.visible = false
 			else:
 				player.visible = false
 			live[slot] = _actors[slot].duplicate() if _actors.has(slot) and _actors[slot].stem == stem else {}
@@ -552,6 +580,7 @@ func set_script_state(state: Dictionary) -> void:
 		_script_unit78.clear()
 		_script_unit74.clear()
 		_source_appearance_modes.clear()
+		_source_refresh_holds.clear()
 	var npc_generation = int(state.get("actor_npc_cache_generation",_actor_npc_cache_generation))
 	if npc_generation != _actor_npc_cache_generation:
 		_actor_npc_cache_generation = npc_generation
@@ -565,6 +594,8 @@ func set_script_state(state: Dictionary) -> void:
 			if int(slot) >= 10: _script_unit74.erase(slot)
 		for slot in _source_appearance_modes.keys():
 			if int(slot) >= 10: _source_appearance_modes.erase(slot)
+		for slot in _source_refresh_holds.keys():
+			if int(slot) >= 10: _source_refresh_holds.erase(slot)
 		for slot in _script_commands_seen.keys():
 			if int(slot) >= 10: _script_commands_seen.erase(slot)
 		for slot in _script_variant_commands_seen.keys():
@@ -581,6 +612,9 @@ func set_script_state(state: Dictionary) -> void:
 		var serial = int(actor.get("command_serial",0))
 		var fields: Array = actor.get("changed_fields",[])
 		_acquire_script_sprite_palette(actor)
+		if actor.get("source_body_missing",false):
+			_script.overrides[id] = actor
+			continue
 		if actor.has("variant") and "variant" in fields and "stem" in fields:
 			if cache_reset: _script_variant_commands_seen[id] = serial
 			elif serial > int(_script_variant_commands_seen.get(id,-1)):
@@ -770,8 +804,9 @@ func _rebuild_source_actor_mode(slot: int, mode: int) -> void:
 	_magic_deferred_targets.erase(slot)
 	_script.get("players",{}).erase(slot); _script.get("overrides",{}).erase(slot)
 	_script_unit78.erase(slot); _script_unit74.erase(slot); _actors.erase(slot)
+	_source_refresh_holds.erase(slot)
 	_source_appearance_modes[slot] = mode
-	_refresh_actors()
+	_build_actor_records(false,slot)
 	_dirty = true
 
 func _source_unit_family(slot: int) -> Array:
@@ -802,17 +837,24 @@ func script_actor_busy(slot: int, include_overlay: bool = false) -> bool:
 		if overlay != null and overlay.busy: return true
 	return false
 
-func restore_script_actor(slot: int) -> void:
+func source_refresh_actor(slot: int, release_first: bool = false, source_mode: int = -1) -> Dictionary:
 	var unit = _unit(slot)
-	if not unit.is_empty() and int(unit.definition_id) == 7:
-		#419060 skips temporary definition7; its current Unit70 remains owned.
-		return
-	_script.get("players",{}).erase(slot)
-	_script.get("overrides",{}).erase(slot)
-	_script_commands_seen.erase(slot)
-	_script_variant_commands_seen.erase(slot)
-	_refresh_actor(slot) #43DE46→4196F0; reconstructed Unit74 is at the logical cell.
-	_dirty = true
+	if unit.is_empty() or int(unit.kind) == 0: return {"rebuilt":false,"released":false,"reason":"invalid_unit"}
+	if release_first:
+		# SYS42 explicitly invokes41AB30 before4196F0. Its old handles remain
+		# released even if the replacement resource cannot be loaded.
+		_script.get("players",{}).erase(slot); _script.get("overrides",{}).erase(slot)
+		_script_unit74.erase(slot); _script_unit78.erase(slot); _actors.erase(slot)
+		_source_appearance_modes.erase(slot)
+	var rebuilt = _refresh_actor(slot,source_mode)
+	if not rebuilt: _source_refresh_holds[slot] = true
+	if rebuilt or release_first:
+		_script.get("players",{}).erase(slot); _script.get("overrides",{}).erase(slot)
+		_script_commands_seen.erase(slot); _script_variant_commands_seen.erase(slot)
+	return {"rebuilt":rebuilt,"released":release_first,"reason":"rebuilt" if rebuilt else "source_early_return","player":unit_player(slot),"stem":str(_actors.get(slot,{}).get("stem","")),"priority":3 if int(unit.control) == 7 else 4}
+
+func restore_script_actor(slot: int) -> void:
+	source_refresh_actor(slot) # Legacy signal adapter; VM uses the result callback when wired.
 
 func request_camera(request: Dictionary) -> void:
 	if request.get("kind","") == "actor":
@@ -1199,30 +1241,36 @@ func _magic_target_pose(slot: int) -> void:
 	var mirror = 16 if direction in [1,2] and data.appearance_definition(int(u.definition_id)) not in [23,73] else 0
 	_actors[slot].player.play(assets.apd(str(_actors[slot].stem)),("F." if direction <= 1 else "B.")+"MIDDLE_DAMAGE",clock_ms,mirror)
 
-func _refresh_actor(slot: int) -> void:
-	_magic_deferred_targets.erase(slot) # Explicit native4196F0 service releases this target only.
+func _actor_dataset_ready(dataset: Dictionary) -> bool:
+	if dataset.is_empty(): return false
+	for sheet in dataset.get("sheets",[]):
+		if assets.apd_image(str(sheet),[[10,64,144]]).is_empty(): return false
+	return true
+
+func _refresh_actor(slot: int, source_mode: int = -1) -> bool:
 	var unit = _unit(slot)
-	if not unit.is_empty() and int(unit.definition_id) == 7: return
-	if not unit.is_empty():
-		var definition = int(unit.definition_id)
-		var letter = "V" if game_mode == 4 and int(unit.kind) != 8 and int(unit.kind) < 30 and data.appearance_definition(definition) not in [23,72,73] else "A"
-		var requested = str(_actor_resource_stems.get(definition,"CHAR_%02d%s" % [definition,letter]))
-		if requested.ends_with("V") and not assets.manifest.get("apds",{}).has(requested) and assets.manifest.get("apds",{}).has("CHAR_%02dA" % definition):
-			actor_resource_load_failures[requested] = {"return_handle":0,"mode":game_mode,"definition":definition,"slot":slot,"existing_unit70_preserved":_actors.has(slot),"source":"419140..419157 early return before release","substitute_loaded":false}
-			return
-	_script_unit74.erase(slot) #4196F0 replaces Unit74; explicit released handles end here.
-	_source_appearance_modes.erase(slot)
-	_script_unit78.erase(slot) #4196F0 deletes the previous Unit78 before appearance rebuild.
-	var previous: Dictionary = _actors.get(slot,{})
+	if unit.is_empty() or int(unit.kind) == 0 or int(unit.definition_id) == 7: return false
+	var definition = int(unit.definition_id)
+	if definition < 0 or definition >= data.load_table("race").size(): return false
+	var appearance_mode = game_mode if source_mode < 0 else source_mode
+	var letter = "V" if appearance_mode == 4 and int(unit.kind) != 8 and int(unit.kind) < 30 and data.appearance_definition(definition) not in [23,72,73] else "A"
+	var requested = str(_actor_resource_stems.get(definition,"CHAR_%02d%s" % [definition,letter]))
+	var missing_optional_v = requested.ends_with("V") and not assets.manifest.get("apds",{}).has(requested) and assets.manifest.get("apds",{}).has("CHAR_%02dA" % definition)
+	if missing_optional_v or not _actor_dataset_ready(assets.apd(requested)):
+		actor_resource_load_failures[requested] = {"return_handle":0,"mode":appearance_mode,"definition":definition,"slot":slot,"existing_unit70_preserved":unit_player(slot) != null,"source":"419140..419157/42C460 early return before release","substitute_loaded":false}
+		return false
+	_magic_deferred_targets.erase(slot)
+	_source_refresh_holds.erase(slot)
+	_script_unit74.erase(slot); _source_appearance_modes.erase(slot); _script_unit78.erase(slot)
+	if source_mode >= 0: _source_appearance_modes[slot] = appearance_mode
+	# 419060 frees/reallocates Unit70/74/78;42DC90 zeroes96B and42DB30 appends
+	# the new sprite to active order. A fresh player resets dither/base flip,
+	# offset and timing; ordinary OP8.play intentionally retains its own state.
+	_script.get("players",{}).erase(slot); _script.get("overrides",{}).erase(slot)
 	_actors.erase(slot)
-	_refresh_actors()
-	if not previous.is_empty() and _actors.has(slot) and previous.stem == _actors[slot].stem:
-		var replacement: FT2APDPlayer = _actors[slot].player
-		previous.player.play(replacement.apd,replacement.label,clock_ms,replacement.flags)
-		previous.player.visible = replacement.visible #4194A1 restores Unit70 after rebuilding.
-		_actors[slot].player = previous.player
-		if _actors[slot].has("shadow"): previous["shadow"] = _actors[slot].shadow
+	_build_actor_records(false,slot)
 	_dirty = true
+	return _actors.has(slot)
 
 func _native_wait_player(slot: int) -> FT2APDPlayer:
 	_refresh_actor(slot)
