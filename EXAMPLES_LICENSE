@@ -22,6 +22,8 @@ explicit paths:
 - game/tests/test_selection_camera.gd.uid
 - game/tests/test_actor_job_start_failure.gd
 - game/tests/test_actor_job_start_failure.gd.uid
+- game/tests/test_placement_appearance.gd
+- game/tests/test_placement_appearance.gd.uid
 - docs/MODDING.md
 - docs/FORMATS.md
 - docs/ASSET_POLICY.md

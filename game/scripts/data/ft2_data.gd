@@ -9,6 +9,7 @@ var _raw_tables: Dictionary = {}
 var _cp949: Dictionary = {}
 var source_root: String
 var prefer_user_saves := true
+var placement_constructed: Array[Dictionary] = [] # Ordered successful41A7F0 calls, including repeated slots.
 
 const U16_FIELDS := {0:"kind",2:"definition_id",4:"level",6:"direction",16:"state",18:"control",20:"weapon",22:"armor",24:"accessory1",26:"accessory2",28:"drop_item",30:"drop_money",32:"unknown20_raw",34:"unknown22_raw"}
 const S16_FIELDS := {36:"hp_max",38:"hp",40:"mp_max",42:"mp",44:"experience",46:"atk",48:"def",50:"int",52:"mdef",54:"agi",56:"skill0",58:"skill1",60:"skill2",62:"skill3",64:"skill4",66:"skill5",68:"skill6",70:"skill7",72:"skill8",74:"skill9",76:"temp_atk",78:"temp_def",80:"temp_int",82:"temp_mdef",84:"temp_agi",86:"attribute0",88:"attribute1",90:"attribute2"}
@@ -198,6 +199,7 @@ func source_bytes(relative: String) -> PackedByteArray:
 	return FT2Content.bytes(path)
 
 func load_placement(number: int, combat = null) -> Array:
+	placement_constructed.clear()
 	var document: Dictionary = read_json("data/port_ready/tables/stages.json")
 	var records: Array = document.get("STAGE%03d" % number, {}).get("records", [])
 	var units: Array = []
@@ -218,6 +220,7 @@ func load_placement(number: int, combat = null) -> Array:
 			var result: Dictionary = combat.rules.construct(units, unit, combat.rng)
 			units = result.units; combat.rng = result.seeds
 			if int(result.slot) < 0: break
+			placement_constructed.append({"slot":int(result.slot),"unit":units[int(result.slot)].duplicate()})
 		else:
 			# Raw placement decoding is diagnostic; gameplay must supply its shared RNG/controller.
 			for slot in range(0 if int(row.control) == 0 else 10, 10 if int(row.control) == 0 else 50):

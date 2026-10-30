@@ -28,6 +28,8 @@ var _actor_palette_acquired: Dictionary = {}
 var actor_resource_load_failures: Dictionary = {} # Original optional V load returned NULL.
 var _actor_cache_generation = 0
 var _actor_npc_cache_generation = 0
+var _actor_placement_serial = 0
+var _placement_unit_overrides: Dictionary = {} # One synchronous constructor row; never written to battle.units.
 var _script: Dictionary = {}
 var _script_commands_seen: Dictionary = {}
 var _script_variant_commands_seen: Dictionary = {}
@@ -371,7 +373,7 @@ func _clamp_camera() -> void:
 func _unit(slot: int) -> Dictionary:
 	if battle == null or slot < 0 or slot >= battle.units.size():
 		return {}
-	return data.decode_unit(battle.units[slot],slot)
+	return data.decode_unit(_placement_unit_overrides.get(slot,battle.units[slot]),slot)
 
 func _mode_handle_key(appearance: Array) -> Array:
 	# Enemy action preparation changes move/action markers without4196F0.
@@ -607,6 +609,21 @@ func set_script_state(state: Dictionary) -> void:
 			if int(slot) >= 10: _script_variant_commands_seen.erase(slot)
 		for slot in _script.get("players",{}).keys():
 			if int(slot) >= 10: _script.players.erase(slot)
+	var placement_players: Dictionary = {}
+	var placement_serial = int(state.get("actor_placement_serial",_actor_placement_serial))
+	if placement_serial != _actor_placement_serial:
+		_actor_placement_serial = placement_serial
+		#41AA00 invalidates the NPC cache first;41A7F0 then calls4196F0 per
+		# successful row, even repeated party slots. Decode that row only for
+		# this visual call so intermediate facings do not change game-unit data.
+		for row in state.get("placement_constructed",[]):
+			var slot = int(row.get("slot",-1))
+			var unit = row.get("unit")
+			if slot < 0 or slot >= battle.units.size() or not unit is PackedByteArray or unit.size() != 124: continue
+			_placement_unit_overrides[slot] = unit
+			var result = source_refresh_actor(slot,false,int(state.get("mode",game_mode)))
+			_placement_unit_overrides.erase(slot)
+			if result.get("rebuilt",false): placement_players[slot] = {"player":result.player,"stem":result.stem,"world":Vector2i(unit.decode_s32(8),unit.decode_s32(12)),"priority":result.priority}
 	var previous = {} if cache_reset else _script.get("players",{})
 	_script = state.duplicate()
 	game_mode = int(state.get("mode",game_mode))
@@ -616,6 +633,12 @@ func set_script_state(state: Dictionary) -> void:
 		var id = int(actor.get("id",0))
 		var serial = int(actor.get("command_serial",0))
 		var fields: Array = actor.get("changed_fields",[])
+		if placement_players.has(id):
+			# A previous OP8/job alias cannot reselect the just-replaced Unit70.
+			actor = actor.duplicate()
+			actor.merge(placement_players[id],true)
+			actor["player_override"] = placement_players[id].player
+			actor.erase("pos"); actor["changed_fields"] = []; fields = []
 		_acquire_script_sprite_palette(actor)
 		if actor.get("source_body_missing",false):
 			_script.overrides[id] = actor

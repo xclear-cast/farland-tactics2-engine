@@ -60,6 +60,8 @@ var actor_sprites: Dictionary = {}
 var actor_cache_generation:=0
 var actor_cache_mode:=1
 var actor_npc_cache_generation:=0
+var actor_placement_serial:=0
+var actor_placement_constructed: Array = []
 var dialogue: Array[Dictionary] = []
 var bitmap := ""
 var alternate_surface:=false #Source462610 suppresses410B20/408A50.
@@ -437,12 +439,38 @@ func _execute(op: int, a: Array) -> bool:
 		10:
 			map_requested.emit(int(a[0]))
 		11:
+			var retained: Dictionary = {}
+			var old_players: Dictionary = {}
+			actor_placement_constructed = []
 			if data.has_method("load_placement"):
 				actor_npc_cache_generation+=1 #41AA31 clears definition10..73 resource cache only.
 				battle.units = data.load_placement(int(a[0]),battle)
+				var receipt = data.get("placement_constructed")
+				if receipt is Array:
+					actor_placement_constructed = receipt.duplicate(true)
+					#41AA00 releases NPCs, but unconstructed party Unit70 objects survive.
+					for key in actor_sprites:
+						var slot := int(key)
+						if slot < 0 or slot >= 10 or _read(slot,0) == 0: continue
+						var kept: Dictionary = actor_sprites[key].duplicate(true)
+						if actor_player_query.is_valid():
+							var player = actor_player_query.call(slot)
+							if player != null:
+								kept["player_override"] = player; kept["source_unit70_owner"] = true
+								kept["changed_fields"] = []; old_players[slot] = player
+						retained[slot] = kept
+				actor_placement_serial += 1
 				placement_loaded.emit(int(a[0]))
-			actor_sprites.clear()
-			_emit_actor_state();_changed()
+			actor_sprites = retained
+			_emit_actor_state()
+			# A synchronous source constructor may have replaced a retained script alias.
+			for row in actor_placement_constructed:
+				var slot := int(row.slot)
+				if not old_players.has(slot) or not actor_player_query.is_valid(): continue
+				var player = actor_player_query.call(slot)
+				if player == null or player == old_players[slot]: continue
+				actor_sprites[slot] = {"id":slot,"command_serial":int(retained[slot].get("command_serial",0)),"changed_fields":[],"world":_cell(slot),"stem":_actor_stem(slot),"player_override":player,"source_unit70_owner":true}
+			_changed()
 		12: camera_requested.emit({"kind":"cell","cell":Vector2i(int(a[0]), int(a[1]))})
 		13: camera_requested.emit({"kind":"actor","slot":int(a[0])})
 		14:
@@ -928,7 +956,7 @@ func _emit_actor_state() -> void:
 				if current != null: snapshot["player_override"] = current; snapshot["source_body_missing"] = false
 				else: snapshot.erase("player_override"); snapshot["source_body_missing"] = true
 			state.merge(snapshot,true); states[int(snapshot.id)] = state
-	actor_changed.emit({"mode":mode,"sprites":states.values(),"actor_cache_generation":actor_cache_generation,"actor_cache_mode":actor_cache_mode,"actor_npc_cache_generation":actor_npc_cache_generation})
+	actor_changed.emit({"mode":mode,"sprites":states.values(),"actor_cache_generation":actor_cache_generation,"actor_cache_mode":actor_cache_mode,"actor_npc_cache_generation":actor_npc_cache_generation,"actor_placement_serial":actor_placement_serial,"placement_constructed":actor_placement_constructed})
 
 func actor_finished(slot: int) -> void:
 	actor_busy.erase(slot)
