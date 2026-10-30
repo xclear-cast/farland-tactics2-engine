@@ -481,13 +481,13 @@ func _execute(op: int, a: Array) -> bool:
 			var stem := str(a[0]); sound_requested.emit(stem.trim_prefix("*"), stem.begins_with("*"))
 		17,63:
 			var slot:=int(a[0])
-			if jobs.is_busy(slot) or (bool(actor_busy_query.call(slot,op==17)) if actor_busy_query.is_valid() else bool(actor_busy.get(slot,false))):return _wait_again()
+			if jobs.is_running(slot) or (bool(actor_busy_query.call(slot,op==17)) if actor_busy_query.is_valid() else bool(actor_busy.get(slot,false))):return _wait_again()
 			if _read(slot,2)==7:
 				var kept:Dictionary=actor_sprites.get(slot,{}).duplicate(true)
 				if actor_player_query.is_valid():kept["player_override"]=actor_player_query.call(slot)
 				kept["world"]=_cell(slot);kept["externally_advanced"]=false
 				actor_sprites[slot]=kept #419060 leaves definition7 Unit70 resource and last frame untouched.
-			jobs.clear(slot); actor_busy.erase(slot)
+			if not jobs.is_busy(slot): jobs.clear(slot); actor_busy.erase(slot)
 			if actor_appearance_refresh.is_valid():
 				if not _request_source_appearance(slot): _emit_actor_state()
 			else:

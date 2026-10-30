@@ -631,7 +631,7 @@ func before_apd(now: int) -> void:
 	service_rng_this_tick = not _direct_this_tick
 	palette_update_this_tick = _direct_this_tick
 	if _id == 77 and _global_phase == 1 and not _proxy.is_empty():
-		_proxy_was_busy = _jobs.is_busy(0)
+		_proxy_was_busy = _jobs.is_running(0)
 		actor_job_pool_service_requested.emit()
 		_jobs.advance(now)
 		_proxy_cross()
@@ -793,7 +793,7 @@ func _proxy77(now: int, busy: bool) -> bool:
 			_jobs.play_path(0,_stem(),_proxy.world,dirs,"RUN",now)
 			_proxy_started_this_tick = true
 		return true
-	if _jobs.is_busy(0):
+	if _jobs.is_running(0):
 		return true
 	if _proxy_was_busy:
 		return true #435084 latched busy before410B20 could complete the final job.

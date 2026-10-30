@@ -216,6 +216,7 @@ func choose_action(identity: int) -> bool:
 	navigation.units = units
 	navigation.movement_grid(selected_slot)
 	_selection_mask = navigation.selection_mask(selected_slot,identity)
+	if identity > 0: camera_requested.emit({"kind":"actor","slot":selected_slot,"source":"WM_COMMAND5000/6000/403540+4034B0"})
 	substate = 1 if identity == 0 else 4 if identity >= 1000 else 3
 	_rebuild_highlights()
 	if identity > 0 and identity < 1000 and rules.magics.decode_u16(identity*64+50) in [3,4]: select_cell(rules.xy(units[selected_slot]))

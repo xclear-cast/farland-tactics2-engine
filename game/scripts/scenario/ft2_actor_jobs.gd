@@ -106,9 +106,14 @@ func advance(now: int) -> void:
 func is_busy(id: int) -> bool:
 	return jobs.has(id) and bool(jobs[id].active)
 
+func is_running(id: int) -> bool:
+	#4124A0 waits only for state2; a failed first selection remains live state1.
+	return is_busy(id) and bool(jobs[id].get("source_started",true))
+
 func snapshots() -> Array[Dictionary]:
 	var out: Array[Dictionary] = []
 	for job in jobs.values():
+		if not job.get("source_started",true): continue # Queued state1 never acquired visual/path ownership.
 		out.append({"id":int(job.id),"stem":str(job.stem),"label":str(job.steps[mini(int(job.index),job.steps.size()-1)].label),
 			"world":Vector2i(job.world),"sort_world":Vector2i(job.sort_world),"player_override":job.player,
 			"externally_advanced":true,"metadata":job.metadata,"visible":true,

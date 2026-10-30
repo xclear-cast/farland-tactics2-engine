@@ -157,6 +157,7 @@ func selection_mask(slot: int,action: int) -> Dictionary:
 	var u: PackedByteArray = units[slot]
 	var start = rules.xy(u)
 	if action == 0:
+		if u.decode_s32(96) != 0: return out #413300 builds physical targets only before the action is consumed.
 		var off = u.decode_u16(20)*56
 		var minimum = rules.items.decode_u16(off+42)
 		var maximum = rules.items.decode_u16(off+44)
