@@ -32,6 +32,8 @@ var _script_commands_seen: Dictionary = {}
 var _script_variant_commands_seen: Dictionary = {}
 var _script_palette_resources_seen: Dictionary = {}
 var _script_unit78: Dictionary = {}
+var _script_unit74: Dictionary = {} # Explicit SYS2 Unit74 handles; NULL means released, not hidden.
+var _source_appearance_modes: Dictionary = {} # Mode owned by a specific source4196F0 rebuild.
 var _overlay: Array = []
 var _texture: ImageTexture
 var _sprite: Sprite2D
@@ -285,6 +287,8 @@ func set_all_actors_visible(visible: bool) -> void:
 		if record.has("icon"): record.icon.visible = visible
 	for record in _script.get("players",{}).values(): record.player.visible = visible
 	for player in _script_unit78.values(): player.visible = visible
+	for shadow in _script_unit74.values():
+		if shadow != null: _set_source_player_visible(shadow,visible)
 	if not magic.caster.is_empty(): magic.caster.player.visible = visible
 	_dirty = true
 
@@ -316,6 +320,8 @@ func remove_actor_visual(slot: int) -> void:
 	_script.get("overrides",{}).erase(slot)
 	_script_commands_seen.erase(slot)
 	_script_unit78.erase(slot)
+	_script_unit74.erase(slot)
+	_source_appearance_modes.erase(slot)
 	_dirty = true
 
 func sync_actor_visuals() -> void:
@@ -365,12 +371,17 @@ func _unit(slot: int) -> Dictionary:
 
 func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 	var live: Dictionary = {}
+	for slot in _script_unit74.keys():
+		if int(_unit(int(slot)).get("kind",0)) == 0: _script_unit74.erase(slot)
+	for slot in _source_appearance_modes.keys():
+		if int(_unit(int(slot)).get("kind",0)) == 0: _source_appearance_modes.erase(slot)
 	var races = data.load_table("race")
 	var items: PackedByteArray = data.raw_table("item")
 	for slot in range(battle.units.size()):
 		if _magic_deferred_targets.has(slot) and _actors.has(slot):
 			live[slot]=_actors[slot];continue
 		var u = _unit(slot)
+		var appearance_mode = int(_source_appearance_modes.get(slot,game_mode))
 		var definition = int(u.definition_id)
 		if int(u.kind) == 0 or definition == 7 or definition >= races.size():
 			continue
@@ -388,8 +399,8 @@ func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 		var prefix = "F." if direction <= 1 else "B."
 		var label = "STAND"
 		var flags = mirror | 128
-		var animate = game_mode == 4 or not _skip_effect_animation
-		var inactive = game_mode == 4 and int(u.kind) != 8 and int(u.kind) < 30 and int(u.move_marker) != 0 and int(u.action_marker) != 0
+		var animate = appearance_mode == 4 or not _skip_effect_animation
+		var inactive = appearance_mode == 4 and int(u.kind) != 8 and int(u.kind) < 30 and int(u.move_marker) != 0 and int(u.action_marker) != 0
 		if inactive:
 			state = 9 if state == 9 else 0
 		if state in [0,6,7]:
@@ -407,12 +418,12 @@ func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 			flags = mirror | 3 if animate else mirror | 128
 		else:
 			label = "DEAD" if state == 1 and control == 0 else "S/DAMAGE" if state == 4 else "A/DAMAGE" if state == 5 else "DOWN_DAMAGE"
-		var letter = "V" if game_mode == 4 and int(u.kind) != 8 and int(u.kind) < 30 and data.appearance_definition(definition) not in [23,72,73] else "A"
+		var letter = "V" if appearance_mode == 4 and int(u.kind) != 8 and int(u.kind) < 30 and data.appearance_definition(definition) not in [23,72,73] else "A"
 		var stem = "CHAR_%02d%s" % [definition,letter]
 		#419117/11A: a loaded definition resource wins over the requested letter.
 		# Entering an EVENT does not turn an existing A cache into a V resource.
 		stem = str(_actor_resource_stems.get(definition,stem))
-		if game_mode == 4 and stem.ends_with("V") and not assets.manifest.get("apds",{}).has(stem) and assets.manifest.get("apds",{}).has("CHAR_%02dA" % definition):
+		if appearance_mode == 4 and stem.ends_with("V") and not assets.manifest.get("apds",{}).has(stem) and assets.manifest.get("apds",{}).has("CHAR_%02dA" % definition):
 			#419140..419157 returns0 before sprite creation when the requested V
 			# file is absent. Keep45EAD0 empty; never substitute the A resource.
 			actor_resource_load_failures[stem] = {"return_handle":0,"mode":4,"definition":definition,"slot":slot,"source":"419140..419157 optional file load failure","substitute_loaded":false}
@@ -420,7 +431,7 @@ func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 			continue
 		var dataset = assets.apd(stem)
 		if not dataset.is_empty(): _actor_resource_stems[definition] = stem
-		if game_mode != 4 and actor_resource_load_failures.has("CHAR_%02dV" % definition): actor_resource_load_failures["CHAR_%02dV" % definition]["later_loaded_resource"] = stem
+		if appearance_mode != 4 and actor_resource_load_failures.has("CHAR_%02dV" % definition): actor_resource_load_failures["CHAR_%02dV" % definition]["later_loaded_resource"] = stem
 		var signature = stem+prefix+label+str(flags)
 		var appearance_key = [u.kind,definition,direction,control,u.state,u.move_marker,u.action_marker,u.weapon,u.armor,u.accessory1,u.accessory2]
 		if preserve_mode_handles and _actors.has(slot) and _actors[slot].stem == stem and _actors[slot].get("appearance_key",[]) == appearance_key:
@@ -462,7 +473,13 @@ func _refresh_actors(preserve_mode_handles: bool = false) -> void:
 			shadow -= signi(shadow)
 		elif state not in [0,6,7]:
 			shadow += signi(shadow)
-		if shadow != 0 and map_id != 69:
+		if _script_unit74.has(slot):
+			if _script_unit74[slot] != null:
+				live[slot]["shadow"] = _script_unit74[slot]
+				live[slot]["shadow_label"] = _script_unit74[slot].label
+			else:
+				live[slot].erase("shadow"); live[slot].erase("shadow_label")
+		elif shadow != 0 and map_id != 69:
 			var shadow_label = "SMALL" if shadow == 1 else "MIDDLE" if shadow == 2 else "LARGE" if shadow == 3 else "HUGE"
 			shadow_label += ".M" #4195E3: native actor shadows use the masked variant.
 			if not live[slot].has("shadow") or live[slot].get("shadow_label","") != shadow_label:
@@ -533,6 +550,8 @@ func set_script_state(state: Dictionary) -> void:
 		_script_variant_commands_seen.clear()
 		_script_palette_resources_seen.clear()
 		_script_unit78.clear()
+		_script_unit74.clear()
+		_source_appearance_modes.clear()
 	var npc_generation = int(state.get("actor_npc_cache_generation",_actor_npc_cache_generation))
 	if npc_generation != _actor_npc_cache_generation:
 		_actor_npc_cache_generation = npc_generation
@@ -542,6 +561,10 @@ func set_script_state(state: Dictionary) -> void:
 			if int(slot) >= 10: _actors.erase(slot)
 		for slot in _script_unit78.keys():
 			if int(slot) >= 10: _script_unit78.erase(slot)
+		for slot in _script_unit74.keys():
+			if int(slot) >= 10: _script_unit74.erase(slot)
+		for slot in _source_appearance_modes.keys():
+			if int(slot) >= 10: _source_appearance_modes.erase(slot)
 		for slot in _script_commands_seen.keys():
 			if int(slot) >= 10: _script_commands_seen.erase(slot)
 		for slot in _script_variant_commands_seen.keys():
@@ -590,12 +613,17 @@ func set_script_state(state: Dictionary) -> void:
 				actor = actor.duplicate()
 				actor["player_override"] = previous[id].player
 		if str(actor.get("stem","")) == "":
+			if actor.has("source_rebuild_mode") and _source_appearance_modes.has(id) and _actors.has(id):
+				actor = actor.duplicate(); actor["player_override"] = _actors[id].player
 			if actor.has("player_override"):
 				var external = {"player":actor.player_override,"signature":"external","notified":false,"actor":actor,"external":true}
 				_script.players[id] = external
 				continue
 			_script.overrides[id] = actor
 			continue
+		if actor.has("source_rebuild_mode") and _source_appearance_modes.has(id) and _actors.has(id):
+			#41AB30 invalidates a saved display alias, not the active source job schedule.
+			actor = actor.duplicate(); actor["player_override"] = _actors[id].player
 		if actor.has("player_override"):
 			_script.players[id] = {"player":actor.player_override,"signature":"external","notified":false,"actor":actor,"external":true}
 			continue
@@ -649,7 +677,8 @@ func _empty_script_body(slot: int,actor: Dictionary) -> Dictionary:
 	blank.visible = false
 	if not base.is_empty():
 		base.player = blank
-		if base.has("shadow"): base.shadow.visible = false
+	var shadow = _unit_shadow(slot)
+	if shadow != null: _set_source_player_visible(shadow,false)
 	var result = actor.duplicate()
 	result["stem"] = stem
 	result["player_override"] = blank
@@ -658,29 +687,34 @@ func _empty_script_body(slot: int,actor: Dictionary) -> Dictionary:
 
 func _apply_script_actor_properties(actor: Dictionary) -> void:
 	var id = int(actor.get("id",-1))
-	var record: Dictionary = _script.players.get(id,_actors.get(id,{}))
-	if record.is_empty(): return
-	var player: FT2APDPlayer = record.player
-	var base: Dictionary = _actors.get(id,{})
 	var serial = int(actor.get("command_serial",actor.get("restart_serial",0)))
 	var fresh = not _script_commands_seen.has(id) or int(_script_commands_seen[id]) != serial
 	var fields: Array = actor.get("changed_fields",actor.keys())
 	if fresh:
 		_script_commands_seen[id] = serial
+		if actor.has("source_rebuild_mode") and "source_rebuild_mode" in fields: _rebuild_source_actor_mode(id,int(actor.source_rebuild_mode))
+		if actor.has("source_shadow_handle") and "source_shadow_handle" in fields: _set_script_shadow_handle(id,bool(actor.source_shadow_handle))
+	var record: Dictionary = _script.players.get(id,_actors.get(id,{}))
+	var player: FT2APDPlayer = record.get("player")
+	var base: Dictionary = _actors.get(id,{})
+	var shadow = _unit_shadow(id)
+	if player == null and shadow == null: return
+	if fresh:
 		if (actor.has("dither_target") and "dither_target" in fields) or (actor.has("dither_kind") and "dither" in fields):
 			var target = int(actor.get("dither_target",actor.get("dither_kind",8)))
 			var interval = int(actor.get("dither_interval",actor.get("dither",0)))
-			var players: Array = [player]
-			if base.has("shadow"): players.append(base.shadow)
+			var players: Array = []
+			if player != null: players.append(player)
+			if shadow != null: players.append(shadow)
 			for faded in players:
 				if target == 0: faded.dither = 8 #43F70B/719, before decreasing fade request.
 				else: faded.visible = true #43F69E/6AC explicitly shows body+shadow.
 				faded.fade_dither(target == 8,interval,clock_ms)
-		elif actor.has("dither") and "dither" in fields:
+		elif player != null and actor.has("dither") and "dither" in fields:
 			player.dither = int(actor.dither)
-		if actor.has("activate_flags") and "activate_flags" in fields: player.activate(int(actor.activate_flags))
-		elif not actor.has("stem") and actor.has("flags") and "flags" in fields: player.activate(int(actor.flags))
-		if actor.has("screen_offset") and "screen_offset" in fields:
+		if player != null and actor.has("activate_flags") and "activate_flags" in fields: player.activate(int(actor.activate_flags))
+		elif player != null and not actor.has("stem") and actor.has("flags") and "flags" in fields: player.activate(int(actor.flags))
+		if player != null and actor.has("screen_offset") and "screen_offset" in fields:
 			record["base_adjust"] = record.get("base_adjust",Vector2i.ZERO)+player.offset+Vector2i(actor.screen_offset)
 			record["adjust_camera"] = camera
 		if actor.get("overlay",false) and "overlay" in fields:
@@ -691,13 +725,13 @@ func _apply_script_actor_properties(actor: Dictionary) -> void:
 				sweat.play(assets.apd("SYSTEM"),("F." if direction <= 1 else "B.")+"SWEAT",clock_ms,1|(16 if direction in [1,2] else 0))
 				_script_unit78[id] = sweat
 	if actor.has("priority"): record["priority"] = int(actor.priority)
-	if fresh and actor.has("body_visible") and "body_visible" in fields:
+	if fresh and player != null and actor.has("body_visible") and "body_visible" in fields:
 		player.visible = bool(actor.body_visible) and player.frame >= 0
 	if fresh and actor.has("visible") and "visible" in fields:
 		for member in _source_unit_family(id): _set_source_player_visible(member,bool(actor.visible))
-	if fresh and base.has("shadow"):
-		if actor.has("shadow_visible") and "shadow_visible" in fields: _set_source_player_visible(base.shadow,bool(actor.shadow_visible))
-		elif actor.has("shadow") and "shadow" in fields: _set_source_player_visible(base.shadow,bool(actor.shadow))
+	if fresh and shadow != null:
+		if actor.has("shadow_visible") and "shadow_visible" in fields: _set_source_player_visible(shadow,bool(actor.shadow_visible))
+		elif actor.has("shadow") and "shadow" in fields: _set_source_player_visible(shadow,bool(actor.shadow))
 
 func set_game_mode(mode: int) -> void:
 	if game_mode != mode:
@@ -711,11 +745,40 @@ func unit_player(slot: int) -> FT2APDPlayer:
 	if _script.get("players",{}).has(slot): return _script.players[slot].player
 	return _actors[slot].player if _actors.has(slot) else null
 
+func _unit_shadow(slot: int) -> FT2APDPlayer:
+	if _script_unit74.has(slot): return _script_unit74[slot]
+	return _actors.get(slot,{}).get("shadow")
+
+func _set_script_shadow_handle(slot: int, enabled: bool) -> void:
+	if int(_unit(slot).get("kind",0)) == 0: return
+	# 43F1C0 SYS2 releases Unit74 or creates LARGE.M only if its handle is NULL.
+	if not enabled:
+		_script_unit74[slot] = null
+		if _actors.has(slot): _actors[slot].erase("shadow"); _actors[slot].erase("shadow_label")
+	elif _unit_shadow(slot) == null:
+		var shadow = FT2APDPlayer.new()
+		shadow.play(assets.apd("SYSTEM"),"LARGE.M",clock_ms,128)
+		_script_unit74[slot] = shadow
+		if _actors.has(slot):
+			_actors[slot]["shadow"] = shadow
+			_actors[slot]["shadow_label"] = "LARGE.M"
+	_dirty = true
+
+func _rebuild_source_actor_mode(slot: int, mode: int) -> void:
+	# SYS43 performs41AB30 before4196F0. Only this Unit's handles are replaced;
+	#45EAD0 APD resources remain cached, and another Unit must not be mode-switched.
+	_magic_deferred_targets.erase(slot)
+	_script.get("players",{}).erase(slot); _script.get("overrides",{}).erase(slot)
+	_script_unit78.erase(slot); _script_unit74.erase(slot); _actors.erase(slot)
+	_source_appearance_modes[slot] = mode
+	_refresh_actors()
+	_dirty = true
+
 func _source_unit_family(slot: int) -> Array:
 	# Unit70 is the effective body; Unit78 is either its replacement overlay
 	# or the base status icon, never both. Independent FX do not own these slots.
 	var base: Dictionary = _actors.get(slot,{})
-	return [unit_player(slot),base.get("shadow"),_script_unit78.get(slot,base.get("icon"))]
+	return [unit_player(slot),_unit_shadow(slot),_script_unit78.get(slot,base.get("icon"))]
 
 func _set_source_player_visible(player: FT2APDPlayer, enabled: bool) -> void:
 	# 42E0B0 leaves an allocated but unplayed (frame-1) pool object untouched.
@@ -1147,6 +1210,8 @@ func _refresh_actor(slot: int) -> void:
 		if requested.ends_with("V") and not assets.manifest.get("apds",{}).has(requested) and assets.manifest.get("apds",{}).has("CHAR_%02dA" % definition):
 			actor_resource_load_failures[requested] = {"return_handle":0,"mode":game_mode,"definition":definition,"slot":slot,"existing_unit70_preserved":_actors.has(slot),"source":"419140..419157 early return before release","substitute_loaded":false}
 			return
+	_script_unit74.erase(slot) #4196F0 replaces Unit74; explicit released handles end here.
+	_source_appearance_modes.erase(slot)
 	_script_unit78.erase(slot) #4196F0 deletes the previous Unit78 before appearance rebuild.
 	var previous: Dictionary = _actors.get(slot,{})
 	_actors.erase(slot)
@@ -1225,6 +1290,8 @@ func _clock_pool(exclude_proxy: bool = false) -> bool:
 		if record.has("shadow"): players.append(record.shadow)
 		if record.has("icon") and not _script_unit78.has(record.slot): players.append(record.icon)
 	for player in _script_unit78.values(): players.append(player)
+	for shadow in _script_unit74.values():
+		if shadow != null: players.append(shadow)
 	for record in _script.get("players",{}).values(): players.append(record.player)
 	for record in physical.records:
 		if not record.deleted: players.append(record.player)
@@ -1643,6 +1710,14 @@ func _render(present: bool = true, copy_mode: bool = false) -> void:
 		if not magic.suppressed.has(record.slot) and not _script.get("players",{}).has(record.slot):
 			var adjust: Vector2i = record.get("base_adjust",Vector2i.ZERO) if record.get("adjust_camera",camera) == camera else Vector2i.ZERO
 			drawables.append({"player":record.player,"anchor":world_to_screen(cell)+adjust,"depth":cell.x+cell.y,"priority":record.priority,"policy":"actor"})
+	if tactical:
+		for slot in _script_unit74:
+			var shadow = _script_unit74[slot]
+			if shadow == null or _actors.has(slot): continue
+			var u = _unit(int(slot))
+			if int(u.kind) == 0: continue
+			var cell = Vector2i(u.x,u.y)
+			drawables.append({"player":shadow,"anchor":_script_shadow_anchor(int(slot),cell),"depth":_script_shadow_depth(int(slot),cell),"priority":2,"policy":"system"})
 	if physical.active:
 		drawables.append_array(physical.drawables(Callable(self,"_fx_world_to_screen"),Callable(self,"world_to_screen")))
 	if magic.active or not magic.caster.is_empty() or not magic.children.is_empty():

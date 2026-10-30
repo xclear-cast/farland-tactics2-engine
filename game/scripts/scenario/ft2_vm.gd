@@ -572,7 +572,7 @@ func _system(op: int, a: Array) -> bool:
 		1:
 			for i in range(10,mini(50,battle.units.size())):
 				if _read(i,18) == 1: _remove_actor(i)
-		2: _sprite(slot,{"shadow_visible":int(a[1]) != 0})
+		2: _sprite(slot,{"source_shadow_handle":int(a[1]) != 0})
 		3: _write(slot,92,int(a[1]),4); _write(slot,96,int(a[1]),4)
 		4: town.set_flag(int(a[0]),int(a[1]))
 		5:
@@ -653,7 +653,13 @@ func _system(op: int, a: Array) -> bool:
 		41: _morph_context()
 		42:
 			_write(context_actor,2,64)
-		43: _write(slot,38,0); _write(slot,42,0); _write(slot,16,1)
+		43:
+			_write(slot,38,0); _write(slot,42,0); _write(slot,16,1)
+			previous_mode = 1 #4400DE..4400F8: release/rebuild this Unit in mode1, then resume EVENT4.
+			if not jobs.is_busy(slot): jobs.clear(slot); actor_busy.erase(slot)
+			var serial := int(actor_sprites.get(slot,{}).get("command_serial",0))
+			actor_sprites[slot] = {"id":slot,"command_serial":serial}
+			_sprite(slot,{"source_rebuild_mode":1})
 		44:
 			battle.add_money(int(a[0])); sound_requested.emit("myturn",false)
 			_show_modal({"kind":"message","text":"%dGold(을)를 손에 넣었다" % int(a[0])}); return true
