@@ -478,7 +478,12 @@ func _execute(op: int, a: Array) -> bool:
 		15:
 			music_fade_direction=int(a[1]);music_fade_requested.emit(int(a[0]),int(a[1]))
 		16:
-			var stem := str(a[0]); sound_requested.emit(stem.trim_prefix("*"), stem.begins_with("*"))
+			var stem := str(a[0]);
+			if stem.is_empty():
+				# Source uses an empty WAVE path to release an active looping cue.
+				sound_stop_requested.emit("")
+			else:
+				sound_requested.emit(stem.trim_prefix("*"), stem.begins_with("*"))
 		17,63:
 			var slot:=int(a[0])
 			if jobs.is_running(slot) or (bool(actor_busy_query.call(slot,op==17)) if actor_busy_query.is_valid() else bool(actor_busy.get(slot,false))):return _wait_again()

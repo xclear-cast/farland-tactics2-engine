@@ -125,6 +125,12 @@ func play_sound(stem: String, loop: bool = false) -> void:
 
 func stop_sound(stem: String) -> void:
 	var key := _key(stem)
+	if key.is_empty():
+		# Empty script WAVE cues release looping ambience while one-shot effects finish.
+		for player in effects.values():
+			if player != null and player.playing and player.stream is AudioStreamWAV and player.stream.loop_mode != AudioStreamWAV.LOOP_DISABLED:
+				player.stop()
+		return
 	if effects.has(key): effects[key].stop()
 
 func is_sound_playing(stem: String) -> bool:

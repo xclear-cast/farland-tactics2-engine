@@ -1081,21 +1081,32 @@ func commands() -> Array[Dictionary]:
 		var geometry:=preload("res://scripts/ui/ft2_native_widgets.gd").listbox_frame(out,_list_rect,height,_list.size(),scroll)
 		list_content=geometry.content
 	var list_rows := maxi(1,int((list_content.size.y+height-1)/height))
+	var list_font:Dictionary=preload("res://scripts/ui/ft2_widgets.gd").dialog_font(resource_id) if dialog in ["load","save"] else CUSTOM_FONT
+	var list_font_height:=absi(int(list_font.get("height",height)))
 	for i in mini(list_rows,maxi(0,_list.size()-scroll)):
 		var index := scroll+i
 		var pos := list_content.position+Vector2i(0,i*height)
 		var row_begin:=out.size()
 		if dialog in ["load","save"]:
-			var row_y:=(index%4)*20+(80 if index==selection else 0)
-			for column in range(0,_list_rect.size.x,320):out.append({"op":"bitmap","key":"BMP/WALL.BMP","pos":pos+Vector2i(column,0),"source":Rect2i(0,row_y,mini(320,_list_rect.size.x-column),20),"transparent":-1})
-			out.append({"op":"text","raw_text":str(_list[index].text),"text":str(_list[index].text).replace("_"," ").replace("*",","),"pos":pos+Vector2i(8,1),"font":CUSTOM_FONT,"color":16,"decor":{"style":0},"clip":_list_rect})
-			out.append({"op":"text","text":str(_list[index].date),"pos":pos+Vector2i(352,1),"font":CUSTOM_FONT,"color":16,"decor":{"style":0},"clip":_list_rect})
+			var selected:=index==selection
+			var text_y:=pos.y+int((height-mini(height,list_font_height))/2)
+			if selected:out.append({"op":"rect","rect":Rect2i(pos,Vector2i(list_content.size.x,height)),"color":4,"filled":true,"clip":list_content})
+			var text_color:int=255 if selected else 0
+			var label:=str(_list[index].text)
+			var label_clip:=Rect2i(pos+Vector2i(2,0),Vector2i(maxi(0,mini(350,list_content.size.x-2)),height))
+			var date_clip:=Rect2i(pos+Vector2i(352,0),Vector2i(maxi(0,list_content.end.x-(pos.x+352)),height))
+			var date_text:=str(_list[index].date)
+			var date_width:=_raw_width(date_text,list_font) if not date_text.is_empty() else 0
+			var date_x:=maxi(date_clip.position.x,date_clip.end.x-8-date_width)
+			out.append({"op":"text","raw_text":label,"text":label.replace("_"," ").replace("*",","),"pos":Vector2i(pos.x+2,text_y),"font":list_font,"color":text_color,"decor":{"raw_gdi":true},"clip":label_clip})
+			if not date_text.is_empty():out.append({"op":"text","text":date_text,"pos":Vector2i(date_x,text_y),"font":list_font,"color":text_color,"decor":{"raw_gdi":true},"clip":date_clip})
 		elif dialog=="units":
 			_draw_unit_row(out,int(_list[index].id),pos,index==selection)
 		else:
 			if index==selection:out.append({"op":"rect","rect":Rect2i(pos,Vector2i(_list_rect.size.x,height)),"color":4,"filled":true})
 			_text(out,str(_list[index].get("text","")),pos+Vector2i(2,2),255 if index==selection else 0)
-		for command_index in range(row_begin,out.size()):out[command_index]["clip"]=list_content
+		for command_index in range(row_begin,out.size()):
+			if not out[command_index].has("clip"):out[command_index]["clip"]=list_content
 	if dialog == "units":
 		_control_rects.erase(1089)
 		if selection >= 0 and selection < _list.size() and int(_list[selection].id)>=0: _unit_slot=int(_list[selection].id)
