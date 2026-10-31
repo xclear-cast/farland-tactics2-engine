@@ -276,19 +276,20 @@ func _button_commands(out:Array[Dictionary],id:int,is_default:bool,focused:bool,
 	# WM_PAINT golden windows. Use that same geometry, underline and XOR focus.
 	var r:Rect2i=control_rects[id]
 	preload("res://scripts/ui/ft2_native_widgets.gd").button(out,r,is_default,pressed)
+	var inner:=Rect2i(r.position+Vector2i(2,2),r.size-Vector2i(4,4))
 	var caption:=str(_captions.get(id,""))
 	var label:=caption.replace("&","")
 	var metrics:=_button_text_metrics(label)
-	var size:=Vector2i(int(metrics.width),-int(FONT.height))
-	var point:=r.position+(r.size-size)/2+(Vector2i.ONE if pressed else Vector2i.ZERO)
-	_rect(out,Rect2i(point,size),7)
-	_text(out,label,point)
+	var size:=Vector2i(int(metrics.width),mini(inner.size.y,-int(FONT.height)))
+	var point:=inner.position+(inner.size-size)/2+(Vector2i.ONE if pressed else Vector2i.ZERO)
+	out.append({"op":"rect","rect":Rect2i(point,size),"color":7,"filled":true,"clip":inner})
+	_text(out,label,point,0,inner)
 	var prefix:=caption.find("&")
 	if prefix>=0 and prefix+1<caption.length():
 		var x:=point.x+int(_button_text_metrics(caption.substr(0,prefix)).width)
 		var width:=int(_button_text_metrics(caption.substr(prefix+1,1)).width)
 		var y:=point.y+int(metrics.get("ascent",10))+1
-		out.append({"op":"line","from":Vector2i(x,y),"to":Vector2i(x+width-1,y),"color":0})
+		out.append({"op":"line","from":Vector2i(x,y),"to":Vector2i(x+width-1,y),"color":0,"clip":inner})
 	if focused:
 		var inset:=4 if is_default else 3
 		out.append({"op":"focus_rect","rect":Rect2i(r.position+Vector2i(inset,inset),r.size-Vector2i(inset*2,inset*2)),"origin":outer_rect.position})

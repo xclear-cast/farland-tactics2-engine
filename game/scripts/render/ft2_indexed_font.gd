@@ -33,6 +33,7 @@ func _init() -> void:
 		return
 	masks = FT2Content.bytes(str(document.mask_file))
 	for style in document.styles:
+		_normalize_style(style)
 		styles[_key(style)] = style
 	var otm = FT2IndexedAssets.read_json("res://assets/indexed/font_otm.json")
 	for row in otm.get("rows", []):
@@ -45,6 +46,29 @@ func _init() -> void:
 				observations[key + "|" + str(measure.text)] = measure.extent
 		if styles.has(key):
 			styles[key]["otm_ascent"] = int(row.get("otmAscent", styles[key].metrics.ascent))
+
+func _normalize_style(style: Dictionary) -> void:
+	if not style.has("metrics") or not style.has("glyphs"):
+		return
+	var raw_height := int(style.get("height", 16))
+	var cell := maxi(1, absi(raw_height))
+	var descent := mini(2, maxi(0, cell - 1)) if raw_height < 0 else maxi(1, roundi(cell * 0.14))
+	var ascent := maxi(1, cell - descent)
+	var raw_ascent := int(style.metrics.get("ascent", ascent))
+	var shift := maxi(0, raw_ascent - ascent)
+	for code in style.glyphs:
+		var glyph: Dictionary = style.glyphs[code]
+		var rect: Array = glyph.get("rect", [0, 0, 0, 0])
+		if rect.size() >= 4:
+			var rows := int(rect[3])
+			rect[1] = clampi(int(rect[1]) - shift, 0, maxi(0, cell - rows)) if rows > 0 else 0
+		var adv: Array = glyph.get("advance", [0, cell])
+		if adv.size() >= 2:
+			adv[1] = cell
+	style.metrics["height"] = cell
+	style.metrics["ascent"] = ascent
+	style.metrics["descent"] = descent
+	style.metrics["internal_leading"] = 0
 
 func _key(font: Dictionary) -> String:
 	return "%s|%d|%d|%d" % [str(font.get("family", "바탕")), int(font.get("height", 16)), int(font.get("weight", 700)), int(font.get("italic", 0))]
@@ -107,7 +131,8 @@ func _supplement(style: Dictionary, font: Dictionary, code: int) -> bool:
 					var pixel:=image.get_pixel(roundi(uv.position.x)+x,roundi(uv.position.y)+y)
 					var alpha: float=pixel.r if image.get_format() in [Image.FORMAT_L8,Image.FORMAT_R8] else pixel.a
 					masks.append(1 if alpha>=0.25 else 0)
-			style.glyphs[key]={"offset":start,"rect":[roundi(offset.x),int(style.metrics.ascent)+roundi(offset.y),width,rows],"advance":[advance,int(style.metrics.height)],"pen":advance,"extension_system_font":true}
+			var gy:=clampi(int(style.metrics.ascent)+roundi(offset.y),0,maxi(0,int(style.metrics.height)-rows)) if rows>0 else 0
+			style.glyphs[key]={"offset":start,"rect":[roundi(offset.x),gy,width,rows],"advance":[advance,int(style.metrics.height)],"pen":advance,"extension_system_font":true}
 			return true
 	return false
 

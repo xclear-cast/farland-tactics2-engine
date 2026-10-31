@@ -323,12 +323,15 @@ func _button_caption(out:Array[Dictionary],caption:String,point:Vector2i,color:i
 
 func _draw_button(out:Array[Dictionary],rect:Rect2i,caption:String,is_default:bool,disabled:bool,focused:bool,pressed:bool)->void:
 	preload("res://scripts/ui/ft2_native_widgets.gd").button(out,rect,is_default,pressed)
+	var inner:=Rect2i(rect.position+Vector2i(2,2),rect.size-Vector2i(4,4))
 	var width:=int(measure.call(caption.replace("&",""),_font).width) if measure.is_valid() else caption.replace("&","").length()*7
-	var size:=Vector2i(width,-int(_font.height))
-	var point:=rect.position+(rect.size-size)/2+(Vector2i.ONE if pressed else Vector2i.ZERO)
-	out.append({"op":"rect","rect":Rect2i(point,size),"filled":true,"color":7})
+	var size:=Vector2i(width,mini(inner.size.y,-int(_font.height)))
+	var point:=inner.position+(inner.size-size)/2+(Vector2i.ONE if pressed else Vector2i.ZERO)
+	out.append({"op":"rect","rect":Rect2i(point,size),"filled":true,"color":7,"clip":inner})
+	var text_begin:=out.size()
 	if disabled:_button_caption(out,caption,point+Vector2i.ONE,255)
 	_button_caption(out,caption,point,248 if disabled else 0)
+	for command_index in range(text_begin,out.size()):out[command_index]["clip"]=inner
 	if focused:
 		var inset:=4 if is_default else 3
 		out.append({"op":"focus_rect","rect":Rect2i(rect.position+Vector2i(inset,inset),rect.size-Vector2i(inset*2,inset*2)),"origin":focus_origin})
