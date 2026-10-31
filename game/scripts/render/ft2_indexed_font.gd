@@ -52,6 +52,8 @@ func _normalize_style(style: Dictionary) -> void:
 		return
 	var raw_height := int(style.get("height", 16))
 	var cell := maxi(1, absi(raw_height))
+	if int(style.metrics.get("ascent", 0)) + int(style.metrics.get("descent", 0)) <= maxi(2, cell):
+		return
 	var descent := mini(2, maxi(0, cell - 1)) if raw_height < 0 else maxi(1, roundi(cell * 0.14))
 	var ascent := maxi(1, cell - descent)
 	var raw_ascent := int(style.metrics.get("ascent", ascent))

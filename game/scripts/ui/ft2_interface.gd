@@ -1450,8 +1450,9 @@ func _hover_commands() -> Array[Dictionary]:
 	var max_hp := mini(130,bytes.decode_s16(36)); var current_hp := mini(130,bytes.decode_s16(38))
 	if max_hp > 0: out.append({"op":"bitmap","key":"BMP/WALL.BMP","pos":Vector2i(hp_x,422),"source":Rect2i(0,192,max_hp,16),"transparent":-1})
 	if current_hp > 0: out.append({"op":"bitmap","key":"BMP/WALL.BMP","pos":Vector2i(hp_x,422),"source":Rect2i(0,176,current_hp,16),"transparent":-1})
-	var mp := _game_text(out,"MP",Vector2i(left+83,440))
-	var mp_x := left+83+int(mp.width)+33
+	var mp_width := int(vm._measure("MP",16,false).width)
+	var mp := _game_text(out,"MP",Vector2i(left+88+int(hp.width)-mp_width,440))
+	var mp_x := left+88+int(hp.width)-mp_width+int(mp.width)+33
 	var max_mp := mini(130,bytes.decode_s16(40)); var current_mp := mini(130,bytes.decode_s16(42))
 	if max_mp > 0: out.append({"op":"bitmap","key":"BMP/WALL.BMP","pos":Vector2i(mp_x,442),"source":Rect2i(160,176,max_mp,16),"transparent":-1})
 	if current_mp > 0: out.append({"op":"bitmap","key":"BMP/WALL.BMP","pos":Vector2i(mp_x,442),"source":Rect2i(160,160,current_mp,16),"transparent":-1})
@@ -1533,8 +1534,9 @@ func _draw_unit_row(out:Array[Dictionary],slot:int,pos:Vector2i,selected:bool)->
 		_game_text(out,padded,pos+Vector2i(64,10),16,0)
 		var state:=bytes.decode_u16(16)
 		if state<STATE_NAMES.size():_game_text(out,STATE_NAMES[state],pos+Vector2i(208,10),16,0)
+		var hp_width:=int(vm._measure("HP",16,false).width);var mp_width:=int(vm._measure("MP",16,false).width)
 		for i in 2:
-			var label:="HP" if i==0 else "MP";var textpos:=pos+Vector2i(64 if i==0 else 59,30+i*20)
+			var label:="HP" if i==0 else "MP";var textpos:=pos+Vector2i(64 if i==0 else 64+hp_width-mp_width,30+i*20)
 			var measured:=_game_text(out,label,textpos,16,0);var bar:=textpos+Vector2i(int(measured.width),2)
 			out.append({"op":"bitmap","key":"BMP/WALL.BMP","pos":bar,"source":Rect2i(160 if selected else 0,192 if selected else 160,154,16),"transparent":5})
 			for current in 2:
