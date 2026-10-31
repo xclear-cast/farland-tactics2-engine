@@ -1081,6 +1081,10 @@ func commands() -> Array[Dictionary]:
 		var geometry:=preload("res://scripts/ui/ft2_native_widgets.gd").listbox_frame(out,_list_rect,height,_list.size(),scroll)
 		list_content=geometry.content
 	var list_rows := maxi(1,int((list_content.size.y+height-1)/height))
+	if dialog in ["load","save"]:
+		# Paint only complete native LISTBOX rows; the last partial row must not
+		# spill across its client edge into the footer or its buttons.
+		list_rows=maxi(1,int(list_content.size.y/height))
 	var list_font:Dictionary=preload("res://scripts/ui/ft2_widgets.gd").dialog_font(resource_id) if dialog in ["load","save"] else CUSTOM_FONT
 	var list_font_height:=absi(int(list_font.get("height",height)))
 	for i in mini(list_rows,maxi(0,_list.size()-scroll)):
@@ -1089,12 +1093,14 @@ func commands() -> Array[Dictionary]:
 		var row_begin:=out.size()
 		if dialog in ["load","save"]:
 			var selected:=index==selection
+			var row_clip:=Rect2i(pos,Vector2i(list_content.size.x,height)).intersection(list_content)
 			var text_y:=pos.y+int((height-mini(height,list_font_height))/2)
 			if selected:out.append({"op":"rect","rect":Rect2i(pos,Vector2i(list_content.size.x,height)),"color":4,"filled":true,"clip":list_content})
 			var text_color:int=255 if selected else 0
 			var label:=str(_list[index].text)
-			var label_clip:=Rect2i(pos+Vector2i(2,0),Vector2i(maxi(0,mini(350,list_content.size.x-2)),height))
-			var date_clip:=Rect2i(pos+Vector2i(352,0),Vector2i(maxi(0,list_content.end.x-(pos.x+352)),height))
+			var label_clip:=Rect2i(row_clip.position+Vector2i(2,0),Vector2i(maxi(0,mini(350,row_clip.size.x-2)),row_clip.size.y))
+			var date_column_x:=pos.x+352
+			var date_clip:=Rect2i(Vector2i(date_column_x,row_clip.position.y),Vector2i(maxi(0,row_clip.end.x-date_column_x),row_clip.size.y))
 			var date_text:=str(_list[index].date)
 			var date_width:=_raw_width(date_text,list_font) if not date_text.is_empty() else 0
 			var date_x:=maxi(date_clip.position.x,date_clip.end.x-8-date_width)
@@ -1500,12 +1506,15 @@ func _draw_check(out:Array[Dictionary],rect:Rect2i,caption:String,radio:bool,che
 func _draw_button(out:Array[Dictionary],rect:Rect2i,caption:String,is_default:bool,disabled:bool,focused:bool,pressed:bool=false)->void:
 	preload("res://scripts/ui/ft2_native_widgets.gd").button(out,rect,is_default,pressed)
 	var font:Dictionary=preload("res://scripts/ui/ft2_widgets.gd").dialog_font(resource_id)
-	var size:=Vector2i(_raw_width(_caption(caption),font),-int(font.height))
-	var point:=rect.position+(rect.size-size)/2+(Vector2i.ONE if pressed else Vector2i.ZERO)
+	var inner:=Rect2i(rect.position+Vector2i(2,2),rect.size-Vector2i(4,4))
+	var text_size:=Vector2i(_raw_width(_caption(caption),font),mini(inner.size.y,-int(font.height)))
+	var point:=inner.position+Vector2i(int((inner.size.x-text_size.x)/2),int((inner.size.y-text_size.y)/2))+(Vector2i.ONE if pressed else Vector2i.ZERO)
 	var inset:=4 if is_default else 3
-	out.append({"op":"rect","rect":Rect2i(point,size),"filled":true,"color":7})
+	out.append({"op":"rect","rect":Rect2i(point,text_size),"filled":true,"color":7,"clip":inner})
+	var text_begin:=out.size()
 	if disabled:_caption_text(out,caption,point+Vector2i.ONE,255,font)
 	_caption_text(out,caption,point,248 if disabled else 0,font)
+	for command_index in range(text_begin,out.size()):out[command_index]["clip"]=inner
 	if focused:out.append({"op":"focus_rect","rect":Rect2i(rect.position+Vector2i(inset,inset),rect.size-Vector2i(inset*2,inset*2)),"origin":_dialog_outer.position+(Vector2i(1,0)if dialog=="stage_select"else Vector2i.ZERO)})
 
 func _child_offset(resource:int)->Vector2i:
