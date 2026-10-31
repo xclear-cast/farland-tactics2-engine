@@ -109,6 +109,8 @@ Cordis 홈 패치 파일은 최상위 **배열**입니다. 새 서버를 넣을 
 
 `serverName`, `transport`, `command`, `args`는 [DeepSeek 공식 MCP client README](https://github.com/deepseek-ai/deepseek-harness/blob/master/packages/mcp/mcp-client/README.md)의 설정 필드입니다. `stdio` 명령에 HTTP용 `url`을 함께 넣지 않습니다. Harness에서는 도구가 `mcp__ft2__ft2_read_project`처럼 서버 이름을 붙여 나타납니다. 먼저 프로젝트 읽기를 요청한 뒤 편집·검사·테스트를 이어가세요.
 
+FT2 서버는 현재 **legacy `initialize` 방식의 MCP**로 연결합니다. 새 SDK의 `server/discover` 탐색에는 `-32601`(method not found)을 반환하고 legacy 연결로 이어집니다. 이 탐색 뒤 같은 프로세스와 재시작한 프로세스에서 14개 도구를 읽는 로컬 stdio 회귀를 확인했습니다. 이는 2026-07-28 프로토콜 전체 구현이나 DeepSeek 실제 계정의 연결 검증을 뜻하지 않습니다. 현재 구현은 [FT2 MCP 서버](../tools/editor_mcp.py)를 참고하세요.
+
 ## 연결 설정을 직접 작성할 때
 
 실행 패키지 사용자는 제작기가 복사해 주는 **실행 파일 경로와 인수**를 그대로 사용하면 됩니다. 아래는 개발용 소스로 연결하는 예시입니다. `C:/FT2/`는 본인의 소스 폴더로, Python 경로는 설치한 Python의 절대 경로로 바꾸세요. Mac에서는 `/Users/사용자명/FT2/` 같은 본인의 절대 경로를 사용합니다.

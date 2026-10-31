@@ -65,6 +65,7 @@ var _waiting_hook = false
 var _hook_response_pending = false
 var _enemy_before_markers: Array = []
 var _held_enemy_slot = -1
+var _enemy_direct_return = false
 var _result_source = -1
 var _ko_busy = false
 var _pending_end_hooks = false
@@ -128,6 +129,7 @@ func load_save(index: int) -> void:
 	highlights.clear()
 	_hook_groups.clear()
 	_waiting_hook = false
+	_enemy_direct_return = false
 	_modal_waiting = false
 	_pickup_active = false
 	_pickup_stage = ""
@@ -406,6 +408,10 @@ func resume_hook(loaded: bool, resume_action: bool = true) -> void:
 
 func hook_started() -> void:
 	# VM must call immediately after synchronous43CFB0 success, before script execution.
+	if _waiting_hook and _hook_stage == "battle" and _return_phase == "enemy":
+		#40B970 returns0 after414C10 loads BATTLE. Its caller40B850 then
+		# returns before comparing92/96; later script completion cannot rewind it.
+		_enemy_direct_return = false
 	if _waiting_hook and _hook_stage == "after":
 		_actor_visuals("visible_all","4149C9",true)
 		post_cursor = _hook_group+1
@@ -731,12 +737,14 @@ func _complete_action() -> void:
 	_preview.clear()
 	_before_units.clear()
 	if _return_phase == "enemy" and _held_enemy_slot >= 0:
-		var u: PackedByteArray = units[_held_enemy_slot]
-		var move_changed = u.decode_s32(92) != _enemy_before_markers[0]
-		var action_changed = u.decode_s32(96) != _enemy_before_markers[1]
-		var rewinds = int(move_changed and u.decode_s32(96) == 0)+int(action_changed and u.decode_s32(92) == 0)
-		enemy_cursor = maxi(0,enemy_cursor-rewinds)
+		if _enemy_direct_return:
+			var u: PackedByteArray = units[_held_enemy_slot]
+			var move_changed = u.decode_s32(92) != _enemy_before_markers[0]
+			var action_changed = u.decode_s32(96) != _enemy_before_markers[1]
+			var rewinds = int(move_changed and u.decode_s32(96) == 0)+int(action_changed and u.decode_s32(92) == 0)
+			enemy_cursor = maxi(0,enemy_cursor-rewinds)
 		_held_enemy_slot = -1
+	_enemy_direct_return = false
 	if _return_phase == "status": _set_phase("status")
 	else: _set_phase(_return_phase)
 	if phase == "player": _pickup_at_actor()
@@ -822,6 +830,7 @@ func prepare_ai_execution(slot: int, decision: Dictionary) -> Dictionary:
 	action_id = int(decision.action_id)
 	_held_enemy_slot = slot
 	_enemy_before_markers = [u.decode_s32(92),u.decode_s32(96)]
+	_enemy_direct_return = true #40B850 may compare markers only if40B970 returns1.
 	if decision.has_action and action_id == 0:
 		#40BAC2: physical can attack from the future path endpoint in this action.
 		rules.set_xy(units[slot],decision.position)
