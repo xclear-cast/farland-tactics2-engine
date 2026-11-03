@@ -570,7 +570,7 @@ func _input(event: InputEvent) -> void:
 				_pause = not _pause; return
 			var accelerator: bool = event.keycode in [KEY_F1,KEY_F2,KEY_F3,KEY_F4,KEY_F5,KEY_F8,KEY_F10,KEY_F11,KEY_F12] or (event.ctrl_pressed and event.keycode in [KEY_I,KEY_Z])
 			if _pause and not accelerator: _step_once = true; return
-	if event is InputEventKey and event.pressed and event.keycode == KEY_F3 and ui.dialog == "":
+	if event is InputEventKey and event.pressed and event.keycode == KEY_F3 and ui.dialog == "" and (overview.active or (vm.mode == 1 and not vm.busy)):
 		overview.handle_command(40030); return
 	if overview.active:
 		if event is InputEventKey and event.pressed and event.keycode == KEY_F12:

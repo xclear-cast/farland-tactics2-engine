@@ -7,6 +7,9 @@ class OwnBattle:
 	var substate:=0
 	var selected_slot:=-1
 	var rng:Array=[2,3,5]
+class OwnVM:
+	extends RefCounted
+	var mode:=9
 class OwnView:
 	extends RefCounted
 	var camera:=Vector2i.ZERO
@@ -62,6 +65,12 @@ func run()->void:
 	check(ui.commands==[40009],"only the current actor available requests the ordinary end-turn confirmation")
 	check(view.draws==draws and ui.menus==menus,"an exhausted cycle does not reopen or repaint the current actor's menu")
 	check(battle.selected_slot==0 and app._next_party_slot==0,"an exhausted cycle retains its previous selection and iterator")
+	var real_ui=FT2Interface.new();var fake_vm=OwnVM.new();real_ui._vm_ref=weakref(fake_vm);real_ui._battle_ref=weakref(battle)
+	var observed:={"overview":0};real_ui.overview_requested.connect(func():observed.overview+=1)
+	real_ui.command(40009);real_ui.command(40030);real_ui.command(40032)
+	check(real_ui.dialog=="" and int(observed.overview)==0,"Town mode9 blocks battle-only EndTurn(40009), Overview(40030), and Objective(40032) commands")
+	fake_vm.mode=1;real_ui.command(40035);real_ui.command(40030)
+	check(int(observed.overview)==1,"Battle mode1 allows Overview(40030) and blocks Town-only marker toggle(40035)")
 	app.free()
 	var report:={"passed":failures.is_empty(),"checks":checks,"failures":failures,"fixtures":"self-authored party records, camera and blocking-menu observations"}
 	for arg in OS.get_cmdline_user_args():

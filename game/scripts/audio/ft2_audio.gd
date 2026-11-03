@@ -36,6 +36,11 @@ func configure(store) -> void:
 func _configure_capabilities(capabilities: Dictionary) -> void:
 	_capabilities_declared = capabilities.get("audio") is Dictionary
 	_audio_capabilities = capabilities.get("audio",{}).duplicate(true) if _capabilities_declared else {}
+	if _capabilities_declared and data != null:
+		if int(_audio_capabilities.get("cdda_tracks",0)) <= 0 and FT2Content.exists(data.resolve("data/port_ready/analysis_completion/backend/cdda/BGM01_CDDA.wav")):
+			_audio_capabilities["cdda_tracks"] = 25
+		if not bool(_audio_capabilities.get("soundfont",false)) and FT2Content.exists(data.resolve("assets/audio/TimGM6mb.sf2")):
+			_audio_capabilities["soundfont"] = true
 	availability_messages.clear()
 	music_available = not _capabilities_declared or int(_audio_capabilities.get("cdda_tracks",0))>0 or bool(_audio_capabilities.get("soundfont",false))
 	if _capabilities_declared and int(_audio_capabilities.get("cdda_tracks",0))==0:

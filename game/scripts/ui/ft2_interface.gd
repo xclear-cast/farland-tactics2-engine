@@ -581,7 +581,9 @@ func open_action_menu(pos: Vector2i) -> void:
 func command(id: int) -> void:
 	if payload.get("gear_context",false) and (id in [40015,40016,40017,40018,40019] or id < 30):
 		_gear_command(id); return
-	if id in [40009,40010,40012,40028,40029,40030,40032,107] and (vm.mode not in [1,9] or (vm.mode == 1 and int(battle.substate) != 0)): return
+	if id in [40009,40030,40032] and (vm.mode != 1 or int(battle.substate) != 0): return
+	if id in [40010,40012,40028,40029,107] and (vm.mode not in [1,9] or (vm.mode == 1 and int(battle.substate) != 0)): return
+	if id == 40035 and vm.mode != 9: return
 	if id in [40028,40029] and forced_stage: return
 	if id >= 5000 and id < 6000: close(); battle.choose_action(id-5000); return
 	if id >= 6000 and id < 7000: close(); battle.choose_action(id-5000); return

@@ -43,6 +43,10 @@ def main():
     destination.mkdir(parents=True, exist_ok=True)
     logs = ROOT / 'private/build'
     logs.mkdir(parents=True, exist_ok=True)
+    if (GODOT.parent / f'{GODOT.stem}.pck').is_file():
+        isolated = logs / f'godot-builder{GODOT.suffix}'
+        shutil.copyfile(GODOT, isolated)
+        GODOT = isolated
     run(['--path',str(ROOT/'game'),'--editor','--import','--quit'],logs/'import.log')
     pack = destination / 'FT2-External.pck'
     manifest = destination / 'engine_manifest.json'

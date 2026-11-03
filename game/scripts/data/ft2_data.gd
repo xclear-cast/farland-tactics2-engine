@@ -232,7 +232,7 @@ func decode_save(bytes: PackedByteArray, index: int, binding: Dictionary = {}) -
 		push_error("Invalid original save length: %d" % bytes.size()); return {}
 	var header := {"stage":bytes.decode_u16(4),"round_index":bytes.decode_s16(38),
 		"title_cp949_raw_hex":bytes.slice(6,38).hex_encode(),
-		"bgm":bytes.decode_u16(106),"money":bytes.decode_s32(108),
+		"bgm":bytes.decode_s16(106),"money":bytes.decode_s32(108),
 		"battle_objective_cp949_raw_hex":bytes.slice(436,468).hex_encode(),
 		"event_variables_independent":[],"system_time_words":[],"inventory":[]}
 	for i in range(25): header.event_variables_independent.append(bytes.decode_s16(40 + i*2))
