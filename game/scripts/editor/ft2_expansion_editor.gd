@@ -328,7 +328,7 @@ func _build_map(form:VBoxContainer)->void:
 	terrain.select(1);_button(form,"apply_cell","선택한 칸에 적용",_apply_cell)
 	_group(form,"캐릭터 배치")
 	_option(form,"spawn.character","캐릭터")
-	var side:=_option(form,"spawn.side","진영");side.add_item("아군",0);side.add_item("적군",1)
+	var side:=_option(form,"spawn.side","진영");side.add_item("아군",0);side.add_item("적군",1);side.add_item("NPC",2)
 	_number(form,"spawn.level","레벨",1,99,1)
 	_button(form,"add_spawn","선택한 칸에 배치",_add_spawn)
 	spawn_list=ItemList.new();spawn_list.custom_minimum_size.y=130;form.add_child(spawn_list)
@@ -583,7 +583,7 @@ func _cell_at(map: Dictionary,point: Vector2i) -> Dictionary:
 	return {"x":point.x,"y":point.y,"height":0,"terrain":1}
 
 func _refresh_map_grid() -> void:
-	if is_instance_valid(map_view):map_view.configure(data);map_view.set_map(_selected_record("maps"),project.content.characters);map_view.selected_cell=selected_cell
+	if is_instance_valid(map_view):map_view.configure(data);map_view.show_grid=bool(_selected_record("maps").get("show_grid",true));map_view.set_map(_selected_record("maps"),project.content.characters);map_view.selected_cell=selected_cell
 	for child in map_grid.get_children():map_grid.remove_child(child);child.queue_free()
 	var map:=_selected_record("maps")
 	if map.is_empty():return
@@ -620,12 +620,12 @@ func _apply_cell() -> void:
 func _add_spawn() -> void:
 	_apply_map();var map:=_selected_record("maps");var id:=_metadata("spawn.character")
 	if id.is_empty():_status("배치할 캐릭터를 먼저 만드세요.",true);return
-	map.placements.append({"character":id,"side":"ally"if fields["spawn.side"].selected==0 else"enemy","x":selected_cell.x,"y":selected_cell.y,"level":int(fields["spawn.level"].value)})
+	map.placements.append({"character":id,"side":"ally"if fields["spawn.side"].selected==0 else("neutral"if fields["spawn.side"].selected==2 else"enemy"),"x":selected_cell.x,"y":selected_cell.y,"level":int(fields["spawn.level"].value)})
 	_refresh_spawns();_status("캐릭터를 선택한 칸에 배치했습니다.")
 
 func _refresh_spawns() -> void:
 	spawn_list.clear()
-	for row in _selected_record("maps").get("placements",[]):spawn_list.add_item("%s · %s · (%d, %d)"%[str(row.get("character",row.get("race","?"))),"아군"if row.get("side")=="ally"else"적군",int(row.x),int(row.y)])
+	for row in _selected_record("maps").get("placements",[]):spawn_list.add_item("%s · %s · (%d, %d)"%[str(row.get("character",row.get("race","?"))),"아군"if row.get("side")=="ally"else("NPC"if row.get("side")=="neutral"else"적군"),int(row.x),int(row.y)])
 
 func _remove_spawn() -> void:
 	var selection:=spawn_list.get_selected_items()
@@ -686,15 +686,19 @@ func _value(text: String) -> Variant:
 func _apply_node() -> void:
 	_apply_story();var story:=_selected_record("stories");var index:=int(selected.nodes)
 	if index<0 or index>=story.nodes.size():return
-	var old:=str(story.nodes[index].id);var type:=_metadata("node.type")
-	var node: Dictionary={"id":fields["node.id"].text.strip_edges(),"type":type}
+	var previous: Dictionary=story.nodes[index]if story.nodes[index]is Dictionary else{}
+	var old:=str(previous.get("id",""));var type:=_metadata("node.type")
+	var node: Dictionary=previous.duplicate(true)if str(previous.get("type",""))==type else{}
+	node.id=fields["node.id"].text.strip_edges();node.type=type
 	match type:
 		"dialogue":
 			node.speaker=fields["node.speaker"].text.strip_edges();node.text=fields["node.text"].text;node.next=fields["node.next"].text.strip_edges()
 		"battle":
 			node.map=_metadata("node.map");node.next=fields["node.next"].text.strip_edges();node.on_defeat=fields["node.on_defeat"].text.strip_edges()
 		"branch":
-			node.variable=fields["node.variable"].text.strip_edges();node.equals=_value(fields["node.equals"].text);node["then"]=fields["node.then"].text.strip_edges();node["else"]=fields["node.else"].text.strip_edges()
+			var variable: String=str(fields["node.variable"].text).strip_edges()
+			if not(node.get("choices")is Array and not node.choices.is_empty()and variable.is_empty()):
+				node.variable=variable;node.equals=_value(fields["node.equals"].text);node["then"]=fields["node.then"].text.strip_edges();node["else"]=fields["node.else"].text.strip_edges()
 		"set":
 			node.variable=fields["node.variable"].text.strip_edges();node.value=_value(fields["node.value"].text);node.next=fields["node.next"].text.strip_edges()
 	story.nodes[index]=node

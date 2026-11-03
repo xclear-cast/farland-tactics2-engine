@@ -72,7 +72,16 @@ func run() -> void:
 	check(map.cells.size()==1 and int(map.cells[0].height)==3 and int(map.cells[0].terrain)==2,"grid edits terrain and height")
 	metadata(editor.fields["spawn.character"],"extra_hero");editor.fields["spawn.side"].select(1);editor.fields["spawn.level"].value=2;editor.buttons.add_spawn.pressed.emit()
 	map=editor.project.content.maps[1]
-	check(map.placements.size()==1 and map.placements[0].character=="extra_hero"and int(map.placements[0].x)==4 and int(map.placements[0].y)==3,"GUI places a character on selected cell")
+	check(editor.project.content.maps[1].placements.size()==1 and map.placements[0].character=="extra_hero"and int(map.placements[0].x)==4 and int(map.placements[0].y)==3,"GUI places a character on selected cell")
+	editor.map_grid.get_child(20).pressed.emit()
+	editor.fields["spawn.side"].select(2);editor.buttons.add_spawn.pressed.emit()
+	map=editor.project.content.maps[1]
+	check(map.placements.size()==2 and map.placements[1].side=="neutral","GUI supports neutral placement side")
+	editor.project.content.maps[1]["show_grid"]=false
+	editor.buttons.apply_map.pressed.emit()
+	check(editor.project.content.maps[1].get("show_grid",true)==false and editor.map_view.show_grid==false,"map show_grid setting survives GUI apply and updates view")
+	var reg:=FT2ExtensionRegistry.new()
+	check(editor.project.valid_id("chapter1.hero")and reg._identifier("chapter1.hero")and not editor.project.valid_id("..")and not reg._identifier(".."),"dotted IDs are accepted while path traversal tokens are rejected")
 	editor.tabs.current_tab=3;editor.buttons.add_stories.pressed.emit()
 	editor.fields["story.id"].text="extra_story";editor.buttons.apply_story.pressed.emit()
 	editor.buttons.add_node.pressed.emit();editor.fields["node.id"].text="hello";editor.fields["node.text"].text="제가 직접 쓴 대사입니다.";editor.fields["node.next"].text="begin";editor.buttons.apply_node.pressed.emit()
@@ -85,6 +94,13 @@ func run() -> void:
 		editor.fields["node.then"].text="hello";editor.fields["node.else"].text="begin";editor.fields["node.next"].text="begin";editor.fields["node.on_defeat"].text="begin"
 		metadata(editor.fields["node.map"],"extra_field");editor.buttons.apply_node.pressed.emit()
 		check(editor.project.content.stories[1].nodes[-1].type==node_type,"GUI authors "+node_type+" node")
+	editor.project.content.stories[1].nodes.append({"id":"choice_branch","type":"branch","text":"선택하세요.","choices":[{"text":"전진","next":"hello","set":{"ready":1}}]})
+	editor._refresh_nodes()
+	editor._select_node(editor.project.content.stories[1].nodes.size()-1)
+	editor.fields["node.variable"].text=""
+	editor.buttons.apply_node.pressed.emit()
+	var choice_node: Dictionary=editor.project.content.stories[1].nodes[-1]
+	check(choice_node.get("choices",[]).size()==1 and choice_node.choices[0].get("next")=="hello","choice-based branch survives GUI node apply without losing choices")
 	var directory:=output.path_join("project")
 	var saved: Dictionary=editor.save_project(directory)
 	check(saved.ok,"GUI-created project saves")

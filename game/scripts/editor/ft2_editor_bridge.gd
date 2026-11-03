@@ -114,12 +114,14 @@ func _merge(base: Dictionary,patch: Dictionary) -> Dictionary:
 	return result
 
 func _shape(kind: String,row: Dictionary) -> bool:
-	var allowed: Dictionary={"characters":["id","name","base_race","sprite","level","stats","skills"],"skills":["id","name","base_skill","visual_skill","mp","power","range_min","range_max"],"maps":["id","name","base_map","width","height","cells","placements"],"stories":["id","start","nodes"]}
+	var allowed: Dictionary={"characters":["id","name","base_race","sprite","level","stats","skills"],"skills":["id","name","base_skill","visual_skill","mp","power","range_min","range_max"],"maps":["id","name","base_map","width","height","show_grid","cells","placements"],"stories":["id","start","nodes"]}
 	for key in row:
 		if not str(key)in allowed[kind]:return false
 		var value=row[key]
 		if str(key)in ["id","name","sprite","start"]:
 			if not value is String:return false
+		elif str(key)=="show_grid":
+			if not value is bool:return false
 		elif str(key)=="stats":
 			if not value is Dictionary:return false
 			for number in value.values():
@@ -188,6 +190,14 @@ func _tool(method: String,params: Dictionary) -> Dictionary:
 			var directory:=DirAccess.open(_canonical(path))
 			if directory==null:return _failure("Project folder does not exist")
 			if directory.is_link("mod.json")or directory.is_link("content.json"):return _failure("Project descriptors must not be symlinks")
+			if bool(_editor.get("_dirty"))and not bool(params.get("discard_unsaved",false)):
+				var backup:=_workspace.path_join(".previous")
+				var backed_up:=false
+				if _allowed_path(backup):
+					var previous_folder: String=model.folder
+					backed_up=bool(model.save_project(backup).get("ok",false))
+					model.folder=previous_folder
+				return {"ok":false,"status":"needs_save","backup":backup if backed_up else"","error":"Unsaved changes in current project; save before opening another project"}
 			return _editor.load_project(_canonical(path))
 		return _editor.export_project(_canonical(path))
 	if method=="validate":return _editor.validate_project()

@@ -1,0 +1,83 @@
+name: Windows x64 regression suite
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [main]
+    paths:
+      - '.github/workflows/windows-x64.yml'
+      - 'game/**'
+      - 'tools/**'
+      - 'mods/**'
+      - 'requirements.txt'
+      - 'README.md'
+  pull_request:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: windows-x64-${{ github.event.pull_request.number || 'push' }}-${{ github.head_ref || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  windows-regression:
+    runs-on: windows-latest
+    timeout-minutes: 25
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.13'
+          cache: pip
+          cache-dependency-path: |
+            requirements.txt
+            build-requirements.txt
+      - name: Install converter dependencies
+        run: python -m pip install -r requirements.txt -r build-requirements.txt
+      - name: Audit tracked public sources
+        run: python tools/audit_publish.py --tracked
+      - name: Fetch verified official Godot console executable
+        shell: pwsh
+        run: |
+          $godot = python tools/ci/fetch_godot_windows.py --destination "$env:RUNNER_TEMP\godot"
+          "GODOT=$godot" | Out-File -FilePath $env:GITHUB_ENV -Append -Encoding utf8
+      - name: Run synthetic content and mod mount tests
+        shell: pwsh
+        run: python tools/run_tests.py --godot "$env:GODOT"
+      - name: Run synthetic runtime regression suite
+        shell: pwsh
+        run: python tools/ci/regression_suite.py --godot "$env:GODOT" --output private/windows-ci/regressions
+      - name: Run synthetic v2 extension and editor tests
+        shell: pwsh
+        run: |
+          $ext = python -c "import sys;sys.path.insert(0,'tools/ci');from prepare_extension_fixtures import prepare;print(prepare('private/windows-ci/extension-synthetic'))"
+          & "$env:GODOT" --headless --audio-driver Dummy --path "$PWD\game" --script res://tests/test_extension_definitions.gd -- "--fixtures=$ext"
+          if ($LASTEXITCODE -ne 0) { throw "test_extension_definitions failed" }
+          & "$env:GODOT" --headless --audio-driver Dummy --path "$PWD\game" --script res://tests/test_extension_editor.gd -- "--editor-output=$PWD\private\windows-ci\editor"
+          if ($LASTEXITCODE -ne 0) { throw "test_extension_editor failed" }
+          & "$env:GODOT" --headless --audio-driver Dummy --path "$PWD\game" --script res://tests/test_editor_baseline.gd -- "--baseline-output=$PWD\private\windows-ci\baseline"
+          if ($LASTEXITCODE -ne 0) { throw "test_editor_baseline failed" }
+          & "$env:GODOT" --headless --audio-driver Dummy --path "$PWD\game" --script res://tests/test_editor_scaling.gd -- "--scaling-output=$PWD\private\windows-ci\scaling"
+          if ($LASTEXITCODE -ne 0) { throw "test_editor_scaling failed" }
+          & "$env:GODOT" --headless --audio-driver Dummy --path "$PWD\game" --script res://tests/test_editor_clients.gd -- "--clients-output=$PWD\private\windows-ci\clients"
+          if ($LASTEXITCODE -ne 0) { throw "test_editor_clients failed" }
+          python tools/ci/validate_editor_clients.py --directory private/windows-ci/clients
+      - name: Run converter and live MCP bridge unit tests
+        shell: pwsh
+        env:
+          FT2_BRIDGE_GODOT: ${{ env.GODOT }}
+        run: |
+          python -m unittest tools.converters.test_graphics tools.converters.scenario_support.test_scenario
+          python tools/converters/tables_audio_support/test_conversion.py
+          python -m unittest discover -s tools/tests -p test_editor_mcp.py -v
+      - name: Upload bounded Windows validation evidence
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: windows-x64-validation
+          path: |
+            private/windows-ci/**/*.json
+            private/windows-ci/**/*.log
+          if-no-files-found: warn
+          retention-days: 14

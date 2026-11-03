@@ -9,12 +9,19 @@ class SyntheticData:
 class EditorFixture:
 	extends RefCounted
 	var project=Project.new()
+	var _dirty:=false
 	var refreshes:=0
 	var plays:=0
 	func _refresh_all():refreshes+=1
-	func _checkpoint():pass
-	func save_project(path):return project.save_project(path)
-	func load_project(path):return project.load_project(path)
+	func _checkpoint():_dirty=true
+	func save_project(path):
+		var result:Dictionary=project.save_project(path)
+		if result.get("ok",false):_dirty=false
+		return result
+	func load_project(path):
+		var result:Dictionary=project.load_project(path)
+		if result.get("ok",false):_dirty=false
+		return result
 	func export_project(path):return project.export_project(path)
 	func validate_project():return project.validate_project()
 	func _test_clicked():plays+=1

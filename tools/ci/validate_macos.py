@@ -16,6 +16,7 @@ ROOT=Path(__file__).resolve().parents[2]
 sys.path.insert(0,str(ROOT/'tools'))
 from run_tests import fixtures
 from prepare_extension_fixtures import prepare as extension_fixtures
+from regression_suite import run_regression_suite
 
 
 def version_tuple(value):
@@ -167,11 +168,7 @@ def main():
     report=json.loads((synthetic/'godot_result.json').read_text(encoding='utf-8'))
     if not report['passed']:raise RuntimeError('Synthetic data/mod integration did not pass')
     run('setup-audio-contracts',[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/'game/tests/test_setup_audio.gd'])
-    for name,argument in [('portrait_palette','palette'),('actor_job_direction','direction'),('actor_sprite_reset','sprite'),('story_palette_snapshot','story-palette'),('story_shadow','shadow'),('cinematic_layer_keys','layer-keys'),('story_unit_visibility','unit-visibility'),('script_sprite_palette','script-palette'),('save_tail_header','save-tail'),('cinematic_reset_lifetime','scene-reset'),('story_palette_wait','palette-wait'),('scene_dispatch','scene-dispatch'),('story_cleanup','cleanup'),('system_palette_acquisition','system-palette'),('story_shadow_handles','shadow-handles'),('story_appearance_refresh','appearance'),('actor_palette_acquisition','actor-palette'),('script_whiten_palette','whiten'),('cache_rebuild_mode','cache-rebuild'),('exp_palette_scope','exp-palette'),('selection_camera','selection-camera'),('actor_job_start_failure','job-start'),('placement_appearance','placement'),('action_camera_and_mask','action-camera'),('actor_job_wait','job-wait'),('source_game_mode','game-mode'),('next_party_presentation','next-party')]:
-        regression_output=output/name;regression_output.mkdir(parents=True,exist_ok=True)
-        run(name,[launcher,'--headless','--audio-driver','Dummy','--script',ROOT/f'game/tests/test_{name}.gd','--',f'--{argument}-output={regression_output}'])
-        regression_report=json.loads((regression_output/'result.json').read_text(encoding='utf-8'))
-        if not regression_report.get('passed'):raise RuntimeError(name+' synthetic runtime regression did not pass')
+    run_regression_suite(launcher,output,run)
     # These definitions and the editor's test project are entirely self-authored.
     # Do not add a real installation path/cache or call the local-game validator.
     extension_synthetic=extension_fixtures(output/'extension-synthetic')

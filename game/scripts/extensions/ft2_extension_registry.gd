@@ -20,7 +20,7 @@ var _apds: Dictionary = {}
 const STATS := ["hp","mp","atk","def","int","mdef","agi"]
 
 func _identifier(value: Variant) -> bool:
-	if not value is String or value.is_empty() or value.length()>64:return false
+	if not value is String or value.is_empty() or value.length()>64 or value in [".",".."] or value.contains(".."):return false
 	for index in value.length():
 		var character: String=value.substr(index,1)
 		if not ((character>="a" and character<="z") or (character>="A" and character<="Z") or (character>="0" and character<="9") or character in ["_","-","."]):return false
@@ -74,7 +74,7 @@ func load_layers(owner, base_races: PackedByteArray, base_magics: PackedByteArra
 	if base_skill_count+skill_keys.size()>1000:issues.append("Too many skills: action IDs 1000+ are reserved for items");return
 	for index in skill_keys.size():
 		var descriptor: Dictionary=skills[skill_keys[index]]
-		descriptor.numeric_id=base_skill_count+index
+		descriptor.numeric_id=base_skill_count+_skill_rows.size()
 		if not _integer(descriptor.get("base_skill",1),1,base_skill_count-1) or not _integer(descriptor.get("visual_skill",descriptor.get("base_skill",1)),1,base_skill_count-1):
 			issues.append("Invalid base/visual skill: "+str(descriptor.global_id));continue
 		descriptor.base_skill=int(descriptor.get("base_skill",1));descriptor.visual_skill=int(descriptor.get("visual_skill",descriptor.base_skill))
@@ -115,7 +115,7 @@ func load_layers(owner, base_races: PackedByteArray, base_magics: PackedByteArra
 	if base_race_count+character_keys.size()>65535:issues.append("Too many character definitions");return
 	for index in character_keys.size():
 		var descriptor: Dictionary=_compiled_characters[character_keys[index]]
-		descriptor.numeric_id=base_race_count+index
+		descriptor.numeric_id=base_race_count+_race_rows.size()
 		if not _integer(descriptor.get("base_race",1),0,base_race_count-1):issues.append("Invalid base race: "+str(descriptor.global_id));continue
 		descriptor.base_race=int(descriptor.get("base_race",1))
 		if not _integer(descriptor.get("level",1),1,99):issues.append("Character level must be 1..99: "+str(descriptor.global_id))

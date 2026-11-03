@@ -664,7 +664,8 @@ func _arrow_hover(direction: Vector2i) -> void:
 
 func _next_party() -> void:
 	if battle.substate != 0: return
-	for offset in range(1,11):
+	#40517E..4051D3: reaching449334 again (offset10) takes the4051D5 end-turn branch.
+	for offset in range(1,10):
 		var slot := (_next_party_slot+offset)%10
 		var unit: PackedByteArray = battle.units[slot]
 		if unit.decode_u16(0) == 0 or unit.decode_u16(16) in [1,3,4,5,8,9] or (unit.decode_s32(92) != 0 and unit.decode_s32(96) != 0): continue

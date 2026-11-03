@@ -75,3 +75,21 @@ AI를 쓰지 않을 때도 같은 화면에서 직접 값을 고치고 **속성 
 
 여러 확장팩은 한 줄에 하나씩 입력하며 아래쪽 항목이 우선합니다.
 실행하는 사람도 자신의 정품 데이터를 준비해야 합니다.
+
+## 7. 배경음악(BGM)과 효과음 안내
+
+- **효과음(SFX)은 기본 제공됩니다**: 정품 게임 폴더(`DATA/`)에 효과음 데이터가 포함되어 있으므로 별도 준비 없이 바로 재생됩니다.
+- **배경음악이 나오지 않을 때**: 사운드폰트(`.sf2`)나 CD 오디오 음원 없이 변환하면 캐시(`content.json`)의 `capabilities.audio`가 `{"cdda_tracks": 0, "soundfont": false}`로 기록되며, 실행 시 `"배경음 자료가 없어 BGM을 사용하지 않습니다. 효과음은 사용할 수 있습니다."` 안내가 표시됩니다(`game/scripts/audio/ft2_audio.gd`). 이는 엔진 오류가 아니라 선택적 배경음 자료가 아직 연결되지 않은 상태입니다.
+- **MIDI 배경음(사운드폰트 `.sf2`) 연결 절차**:
+  1. General MIDI 호환 `.sf2` 파일(예: `TimGM6mb.sf2`)을 준비합니다(저작권·저장소 경계 정책상 저장소에는 포함하지 않습니다).
+  2. 변환 시 `--soundfont` 옵션을 지정해 실행합니다:
+     ```sh
+     python tools/convert_installation.py --source "<정품 게임 폴더>" --output "<개인 캐시 폴더>" --soundfont "<경로/TimGM6mb.sf2>"
+     ```
+  3. 변환이 완료되면 캐시 내 `assets/audio/TimGM6mb.sf2`와 `content.json`의 해시 목록이 갱신되고 `capabilities.audio.soundfont`가 `true`가 됩니다.
+  4. `soundfont: true` 상태에서는 런타임(`game/scripts/midi_output/ft2_midi_output.gd`)이 GDExtension 네이티브 신스(`FT2NativeSynth`, `game/native/bin/ft2synth.dll` · `libft2synth.so` · `libft2synth.macos.arm64.dylib`)를 통해 사운드폰트와 MIDI 데이터를 로드하여 실시간 오디오 스트림으로 재생합니다.
+- **CD 오디오(CDDA) 배경음 연결 절차**:
+  - 원작 CD 오디오 트랙(트랙 2~23) 파일이 들어 있는 폴더가 있다면 `--cdda-dir "<CD 음원 폴더>"` 옵션을 함께 지정해 변환합니다(`--soundfont`와 동시에 지정 가능).
+- **재변환과 캐시 재사용 규칙 (`tools/convert_installation.py`)**:
+  - 변환기는 변환 스크립트·`tools/converters/font_charset.json`의 해시(`pipeline_sha256`), 정품 폴더 파일 해시(`source_files`), 그리고 오디오 입력 해시(`audio_inputs`: 지정한 `.sf2` 및 CD 트랙 파일 해시)가 모두 일치할 때만 기존 캐시를 재사용합니다.
+  - `--soundfont` 또는 `--cdda-dir`을 새로 추가하거나 바꾸면 `audio_inputs`가 변경되어 자동으로 재변환되며, 필요 시 `--force`로 전체 재변환을 강제할 수 있습니다.

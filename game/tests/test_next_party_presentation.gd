@@ -57,6 +57,11 @@ func run()->void:
 	battle.substate=0;battle.units[4].encode_u16(16,8);app._next_party()
 	check(battle.selected_slot==0,"stone status is skipped and ordinary party selection wraps")
 	check(ui.menu_saw_camera==Vector2i.ZERO,"wrapped selection also presents its new scene before opening")
+	battle.units[1].encode_u16(16,1);draws=view.draws;menus=ui.menus
+	app._next_party()
+	check(ui.commands==[40009],"only the current actor available requests the ordinary end-turn confirmation")
+	check(view.draws==draws and ui.menus==menus,"an exhausted cycle does not reopen or repaint the current actor's menu")
+	check(battle.selected_slot==0 and app._next_party_slot==0,"an exhausted cycle retains its previous selection and iterator")
 	app.free()
 	var report:={"passed":failures.is_empty(),"checks":checks,"failures":failures,"fixtures":"self-authored party records, camera and blocking-menu observations"}
 	for arg in OS.get_cmdline_user_args():

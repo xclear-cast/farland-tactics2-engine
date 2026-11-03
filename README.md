@@ -261,7 +261,10 @@ JSON Pointer의 `/`는 `~1`, `~`는 `~0`으로 씁니다. `set`(추가/교체),
 검사하고, 실제 전투가 읽는 바이너리와 UI가 읽는 레코드를 동시에 갱신합니다.
 지원 필드는 `game/scripts/content/ft2_content.gd`의 `TABLE_FIELDS`에 있습니다.
 원하는 새 파일을 추가하는 기능이 새 스킬 종류/VM 명령/무제한 ID 추가까지 보장하지는
-않습니다. 엔진이 지원하지 않는 기능은 엔진 코드도 확장해야 합니다.
+않습니다. 엔진이 지원하지 않는 기능은 엔진 코드도 확장해야 합니다. 특히 모드나 패치로
+`data/port_ready/scenario/system_dispatch.json`에 새 시스템 호출 ID를 추가할 때는,
+`game/scripts/vm/ft2_vm.gd`가 해당 호출에서 소비하는 피연산자(operand) 개수·서명과
+일치하는 엔트리만 매핑해야 바이트코드 명령 포인터(`ip`)가 어긋나지 않습니다.
 
 세이브는 콘텐츠 ID와 활성 모드의 순서·설정·파일 해시에 따른 별도 프로필에 저장합니다.
 정품 세이브와 기존 Godot 이식본의 사용자 세이브는 덮어쓰지 않습니다.
@@ -286,7 +289,15 @@ python tools/converters/tables_audio_support/test_conversion.py
 네이티브 어댑터 바이너리는 소스 Git에 포함하지 않으며 각 대상에서 빌드해야 합니다.
 Godot로 엔진을 실행하거나 패키징하기 전에 `game/native/bin`에 해당 플랫폼의
 어댑터를 생성합니다. Mac 빌더는 아래 명령을 사용합니다. Windows/Linux 개발 빌더는
-자신의 Godot 실행 파일 경로와 해당 네이티브 바이너리를 준비해야 합니다.
+자신의 Godot 실행 파일 경로와 `game/native/ft2_synth.c`로부터 빌드한 네이티브 바이너리를 준비해야 합니다:
+
+```sh
+# Linux (x86_64)
+cc -std=c11 -O2 -fPIC -shared -Igame/native game/native/ft2_synth.c -lm -o game/native/bin/libft2synth.so
+
+# Windows (x86_64, MinGW-w64 gcc 또는 clang)
+gcc -std=c11 -O2 -shared -Igame/native game/native/ft2_synth.c -o game/native/bin/ft2synth.dll
+```
 
 커밋 전 소스 공개 경계 검사:
 

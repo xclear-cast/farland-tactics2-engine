@@ -125,10 +125,10 @@ func new_project() -> void:
 	folder="";issues.clear()
 
 static func valid_id(value: String) -> bool:
-	if value.is_empty() or value.length()>64: return false
+	if value.is_empty() or value.length()>64 or value in [".",".."] or value.contains(".."): return false
 	for index in value.length():
 		var code:=value.unicode_at(index)
-		if not(code>=48 and code<=57 or code>=65 and code<=90 or code>=97 and code<=122 or code in [45,95]): return false
+		if not(code>=48 and code<=57 or code>=65 and code<=90 or code>=97 and code<=122 or code in [45,46,95]): return false
 	return true
 
 func next_id(kind: String, prefix: String) -> String:
@@ -265,7 +265,8 @@ func validate_project() -> Dictionary:
 		if int(row.get("range_min",0))<0 or int(row.get("range_max",0))<int(row.get("range_min",0)):_issue(label+"최대 거리는 최소 거리 이상이어야 합니다.")
 	for row in content.maps:
 		var label: String="맵 "+str(row.id)+": "
-		_keys(row,["id","name","base_map","width","height","cells","placements"],label)
+		_keys(row,["id","name","base_map","width","height","show_grid","cells","placements"],label)
+		if row.has("show_grid")and not row.show_grid is bool:_issue(label+"격자 형식 오류")
 		var width:=int(row.get("width",0));var height:=int(row.get("height",0))
 		if not _integer(row.get("width",0),1,64)or not _integer(row.get("height",0),1,64):_issue(label+"맵 크기는 각 1~64칸입니다.")
 		if int(row.get("base_map",-1))<0:_issue(label+"원작 타일을 참조할 기반 맵을 선택하세요.")
@@ -292,7 +293,7 @@ func validate_project() -> Dictionary:
 			elif not spawn.has("character") and not spawn.has("race"):_issue(label+"배치할 캐릭터를 선택하세요.")
 			var side:=str(spawn.get("side",""))
 			if side=="ally":ally_count+=1
-			elif side=="enemy":enemy_count+=1
+			elif side in ["enemy","neutral"]:enemy_count+=1
 			else:_issue(label+"진영은 ally 또는 enemy입니다.")
 		if ally_count>10 or enemy_count>40:_issue(label+"한 전투는 아군 10명·적군 40명까지 지원합니다.")
 	for story in content.stories:_validate_story(story)

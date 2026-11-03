@@ -20,7 +20,7 @@ def sha(path):
 
 def run(arguments, log):
     result = subprocess.run([str(GODOT), '--headless', '--audio-driver', 'Dummy', *arguments],
-        env=dict(os.environ, GODOT_SILENCE_ROOT_WARNING='1'), capture_output=True, text=True, timeout=90)
+        env=dict(os.environ, GODOT_SILENCE_ROOT_WARNING='1'), capture_output=True, text=True, encoding='utf-8', errors='replace', timeout=90)
     output = result.stdout + result.stderr
     log.write_text(output, encoding='utf-8')
     errors = [line for line in output.splitlines() if line.startswith(('ERROR:', 'SCRIPT ERROR:'))]
